@@ -161,9 +161,9 @@ pop.w      {r7, lr};
 反之，去掉`asm __volatile__("");`，编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行了优化，导致在`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`里，不再建立调用栈帧，而是直接跳转到perform入口地址，再结合前面说到的BX指令的功能，在perform里“看来”，此时的上一级栈帧，以及返回地址跟`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`毫无关系，在此例中在perform“看来”,它的上一级调用函数应该是"main"。因此此时从调试器里是看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
 的。
 
-再提一个问题：“为什么要进行尾部调用优化?”,这恐是编译器的某种规则，具体细节,由于才疏学浅，我也无法准确回答这个.但是只要GET到一个重点:
+再提一个问题：“为什么要进行尾部调用优化?”,这恐是编译器的某种规则，具体细节,由于才疏学浅，我也无法准确回答.但是只要GET到一个重点:
 
-`asm __volatile__("");`放在函数尾部，确实阻止了编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行优化，而这种优化会导致在调试器里调用栈里看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数。但是，这种优化是不影响程序功能的，因为它还是更简洁正确地跳转到了perform。但是如果不阻止，是一定会被优化的，因为苹果发布出来的库，肯定是Relase版本的，Release版本默认的优化级别很高。
+`asm __volatile__("");`放在函数尾部，确实阻止了编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行优化，而这种优化会导致在调试器调用栈里看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数。但是，这种优化是不影响程序功能的，因为它还是更简洁正确地跳转到了perform。但是如果不阻止，是一定会被优化的，因为苹果发布出来的库，肯定是Relase版本的，Release版本默认的优化级别很高。
 
 可以猜测，苹果之所以将这些函数命名的如此特殊便于识别:
 ```c
