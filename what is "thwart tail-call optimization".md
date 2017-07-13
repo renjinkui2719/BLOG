@@ -15,7 +15,7 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(void (*pe
 ```c
 asm __volatile__(""); // thwart tail-call optimization
 ```
-的用意何在，百思不解。注释的意思是:"阻止尾递归调用优化".
+的用意何在，百思不解。注释的意思是:"阻止尾部调用优化".
 
 并且，其他几个函数:
 ```c
@@ -27,33 +27,15 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__() __at
 
 在函数尾部均有`asm __volatile__(""); // thwart tail-call optimization`
 
+回到`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`,为了弄清楚:编译器究竟会怎么进行"尾部调用优化"?,优化和不优化的区别是什么?，带着疑惑进行如下操作：
 
-
-一说起递归，谈的最多的就是递归对栈空间的消耗问题，如果递归过深，很容易爆栈，比如不小心写了这样的代码:
-```Objective-C
-- (void)viewDidLoad {
-    [self viewDidLoad];
-    //xxxxx
-}
-```
-瞬间就崩了。
-
-那何为尾递归调用优化&何为尾递归?
-
-https://stackoverflow.com/questions/310974/what-is-tail-call-optimization
-http://blog.csdn.net/mr_listening/article/details/51106535
-
-看了两篇资料后，总结起来就是“某种递归的算法+写法 可以被优化成循环”。如果编译器将递归优化成了循环，自然就不再有暴增的栈开销。
-
-回到`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`,这个函数其实跟递归扯不上关系，何来的尾递归优化，带着疑惑进行如下操作：
-
-1. 将`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数声明以及实现复制到一个demo工程并张贴到main.m 
+1. 将`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数声明以及实现复制到一个demo工程并粘贴到main.m 
 
 2. 将xcode DEBUG优化选项设置为-O2 (开了优化才能看到究竟会怎样优化), 将arm64架构去掉(arm32汇编比arm64汇编易懂)
  
-3. 调用`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`,
+3. 调用`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
 
-即:
+例子如下:
 ```c
 static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__() __attribute__((noinline));
 static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__(void (*perform)(void *), void *info)
@@ -132,7 +114,7 @@ int main(int argc, char * argv[])
 
 
 
-神奇的事情发生了，在注释了`asm __volatile__("");`(进行过尾递归优化)的版本里，调试器调用栈里是没有`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的。换句话说，在被优化的版本里，调试器是获取不到 `___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的栈帧的。
+神奇的事情发生了，在注释了`asm __volatile__("");`(进行过尾部调用优化)的版本里，调试器调用栈里是没有`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的。换句话说，在被优化的版本里，调试器是获取不到 `___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的栈帧的。
 
 由此引出了一个问题:"获取函数调用栈的原理是什么?",找了篇资料，是intel+linux平台的，但是原理却是说得清晰的:
 
@@ -166,7 +148,7 @@ Branch and Exchange causes a branch to an address and instruction set specified 
 
 正式回到 `___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行分析:
 
-当通过`asm __volatile__("");`阻止了尾递归优化后,生成的汇编代码中，调用perform的方式是 :
+当通过`asm __volatile__("");`阻止了尾部调用优化后,生成的汇编代码中，调用perform的方式是 :
 ```assembly
 push       {r7, lr};
 mov        r7, sp;
@@ -179,7 +161,7 @@ pop.w      {r7, lr};
 反之，去掉`asm __volatile__("");`，编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行了优化，导致在`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`里，不再建立调用栈帧，而是直接跳转到perform入口地址，再结合前面说到的BX指令的功能，在perform里“看来”，此时的上一级栈帧，以及返回地址跟`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`毫无关系，在此例中在perform“看来”,它的上一级调用函数应该是"main"。因此此时从调试器里是看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
 的。
 
-再次回到之前提到的一个问题：“这里跟递归没什么关系，为什么这个优化叫做'尾递归优化呢'”,才疏学浅，我也无法准确回答这个问题，但是只要GET到一个重点:
+再提一个问题：“为什么要进行尾部调用优化?”,这恐是编译器的某种规则，具体细节,由于才疏学浅，我也无法准确回答这个.但是只要GET到一个重点:
 
 `asm __volatile__("");`放在函数尾部，确实阻止了编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行优化，而这种优化会导致在调试器里调用栈里看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数。但是，这种优化是不影响程序功能的，因为它还是更简洁正确地跳转到了perform。但是如果不阻止，是一定会被优化的，因为苹果发布出来的库，肯定是Relase版本的，Release版本默认的优化级别很高。
 
@@ -191,7 +173,7 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_TIMER_CALLBACK_FUNCTION__() __attrib
 static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__() __attribute__((noinline));
 ```
 
-并且将其强制"noinline"，又阻止编译器进行”尾递归优化“,有很大的原因是为了在其他模块，或app，在与Runloop模块交互的时候，整个调用路径“看起来/调试起来”更加清晰分明。
+并且将其强制"noinline"，又阻止编译器进行”尾部调用优化“,有很大的原因是为了在其他模块，或app，在与Runloop模块交互的时候，整个调用路径“看起来/调试起来”更加清晰分明。
 
 ## 总结:
 **如果不加`asm __volatile__("");`来阻止优化，经高级别优化过的库，在使用者的调试器调用栈里将看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`.**
