@@ -110,7 +110,9 @@ int main(int argc, char * argv[])
 ![Image](http://oem96wx6v.bkt.clouddn.com/屏幕快照%202017-07-13%20上午11.33.48.png)
 
 
-**然后，注释掉`asm __volatile__("");`**再次生成，得到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`:
+**然后，注释掉`asm __volatile__("");`**
+
+再次生成，得到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`:
 
 ```assembly
 
@@ -192,4 +194,4 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__() __at
 并且将其强制"noinline"，又阻止编译器进行”尾递归优化“,有很大的原因是为了在其他模块，或app，在与Runloop模块交互的时候，整个调用路径“看起来/调试起来”更加清晰分明。
 
 ## 总结:
-** 如果不加`asm __volatile__("");`来阻止优化，经高级别优化过的库，在使用者的调试器调用栈里将看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`. **
+**如果不加`asm __volatile__("");`来阻止优化，经高级别优化过的库，在使用者的调试器调用栈里将看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`.**
