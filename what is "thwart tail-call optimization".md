@@ -116,7 +116,7 @@ int main(int argc, char * argv[])
 
 神奇的事情发生了，在注释了`asm __volatile__("");`(进行过尾部调用优化)的版本里，调试器调用栈里是没有`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的。换句话说，在被优化的版本里，调试器是获取不到 `___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的栈帧的。
 
-由此引出了一个问题:"获取函数调用栈的原理是什么?",找了篇资料，是intel+linux平台的，但是原理却是说得清晰的:
+由此引出了一个问题:"获取函数调用栈的原理是什么?",找了篇资料，是linux平台的，但是原理却是说得清晰的:
 
 http://blog.csdn.net/study_live/article/details/43274271
 
