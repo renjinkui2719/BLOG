@@ -138,22 +138,7 @@ mov        r7, sp;//建立自己的栈帧
 
 “这样就算建立起栈帧了？”，深入研究一下刚刚提到的这篇文章，就会理解了。
 
-准备回到原例子继续分析，但是在这之前，还需要插入一个点:"`BLX`指令与`BX`指令"， 查ARM文档得:
-
-BLX (register)
-Branch with Link and Exchange (register) calls a subroutine at an address and instruction set specified by a register.
-
-BX
-Branch and Exchange causes a branch to an address and instruction set specified by a register.
-
-除了具有ARM，THUM指令集的切换功能外，BLX是带链接（返回地址）的跳转，即子程序调用(call)，执行BLX相当于:
-
-1. 将BLX下一条指令的地址， 即返回地址保存到LR
-2. 跳转到函数入口
-
-而BX仅仅是跳转到指定地址执行(JMP)。
-
-正式回到 `___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行分析:
+回到原例子继续分析， `___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行分析:
 
 当通过`asm __volatile__("");`阻止了尾部调用优化后,生成的汇编代码中，调用perform的方式是 :
 ```assembly
@@ -163,10 +148,9 @@ mov        r0, r1;
 blx        r2; 
 pop.w      {r7, lr};
 ```
-进入perform前，`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`栈帧已经建立，所以在调试器里，可以识别出perform的上一级函数是:`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
+进入perform前，`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`**栈帧已经建立**，所以在调试器里，可以识别出perform的上一级函数是:`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
 
-反之，去掉`asm __volatile__("");`，编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行了优化，导致在`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`里，不再建立调用栈帧，而是直接跳转到perform入口地址，再结合前面说到的BX指令的功能，在perform里“看来”，此时的上一级栈帧，以及返回地址跟`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`毫无关系，在此例中在perform“看来”,它的上一级调用函数应该是"main"。因此此时从调试器里是看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
-的。
+反之，去掉`asm __volatile__("");`，编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行了优化，导致在`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`里，**不再建立调用栈帧**，而是直接跳转到perform入口地址，在perform里“看来”，此时的上一级栈帧，跟`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`毫无关系，在此例中在perform“看来”,它的上一级调用函数应该是"main"。因此此时从调试器里是看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`的。
 
 ## GET到一个重点
 
