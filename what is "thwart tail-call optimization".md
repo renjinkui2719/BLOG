@@ -1,3 +1,5 @@
+### 问题 
+
 在阅读CoreFoundation开源代码时，有c函数:
 ```c
 static void __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__() __attribute__((noinline));
@@ -27,10 +29,11 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__() __at
 
 在函数尾部均有`asm __volatile__(""); // thwart tail-call optimization`
 
-何为尾部调用优化?
+### 何为尾部调用优化?
 
 找到了一个[文章片段](http://es6.ruanyifeng.com/#docs/function#尾调用优化)，来自阮一峰老师的ES6教程,讲的是javascript,但是其中关于尾部调用优化的描述应该是语言无关的.
 
+### 一探究竟
 回到`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`,为了弄清楚:编译器究竟会怎么进行"尾部调用优化"?,优化和不优化的区别是什么?，带着疑惑进行如下操作：
 
 1. 将`__CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数声明以及实现复制到一个demo工程并粘贴到main.m 
@@ -165,7 +168,7 @@ pop.w      {r7, lr};
 反之，去掉`asm __volatile__("");`，编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行了优化，导致在`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`里，不再建立调用栈帧，而是直接跳转到perform入口地址，再结合前面说到的BX指令的功能，在perform里“看来”，此时的上一级栈帧，以及返回地址跟`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`毫无关系，在此例中在perform“看来”,它的上一级调用函数应该是"main"。因此此时从调试器里是看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`
 的。
 
-至此只要GET到一个重点:
+### GET到一个重点
 
 `asm __volatile__("");`放在函数尾部，使函数"结尾不是函数调用"，确实阻止了编译器对`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`进行尾部调用优化，而这种优化会导致在调试器调用栈里看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`函数。但是，这种优化是不影响程序功能的，因为它还是更简洁正确地跳转到了perform。但是如果不阻止，是一定会被优化的，因为苹果发布出来的库，肯定是Relase版本的，Release版本默认的优化级别很高。
 
@@ -179,5 +182,5 @@ static void __CFRUNLOOP_IS_CALLING_OUT_TO_AN_OBSERVER_CALLBACK_FUNCTION__() __at
 
 并且将其强制"noinline"，又阻止编译器进行”尾部调用优化“,有很大的原因是为了在其他模块，或app，在与Runloop模块交互的时候，整个调用路径“看起来/调试起来”更加清晰分明。
 
-## 总结:
+### 总结
 **如果不加`asm __volatile__("");`来阻止尾部调用优化，在调用者的调试器调用栈里将看不到`___CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__`.**
