@@ -199,7 +199,7 @@ scp root@192.168.2.15:/var/mobile/Containers/Data/Application/7A2AAC43-55F5-41A2
 #### 3.安装测试
 iTools 或其他工具，直接拖入安装
 
-![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_110624.png)
+![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_124410.png)
 
 安装且运行成功，说明重签名没问题，接下来就是修改字符串了.
 
