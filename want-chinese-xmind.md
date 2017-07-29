@@ -250,7 +250,7 @@ strings文件实际上就是plist文件，假设文件全名为:Localizable.stri
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%881.09.38.png)
 
 #### 4.字符串写死在程序
-
+另一个例子， XX App, 启动后首页如下:
 
 
 本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，key
