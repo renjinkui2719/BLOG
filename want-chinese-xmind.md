@@ -1,4 +1,4 @@
-以很好用的思维导图工具Xmind为主例，试验与记录app字符串的修改与重签名，仅作学习目的，未行不轨之事。
+以很好用的思维导图工具Xmind为主例,其他几个App为辅例，试验与记录app字符串的修改与重签名，仅作学习目的，未行不轨之事。
 
 ## 材料
 越狱手机一部,itunes store 下载的xMind.ipa,[砸壳工具](https://github.com/stefanesser/dumpdecrypted)(下载后编译出dumpdecrypted.dyld)，[重签名工具](https://github.com/chenhengjie123/iOS_resign_scripts).
@@ -19,7 +19,10 @@ unzip xmin_cloud.ipa -d xmin_cloud_unziped
 ## 砸壳
 #### 1.在越狱手机上安装xMind，杀掉所有其他应用，单独打开xMind.
 
-#### 2.Terminal 执行 `ssh root@ip`,登录到手机. ip为手机ip, 密码为越狱后打开SSH端口设置的密码，如果没改过，默认是"alpine".
+#### 2.Terminal 执行 `ssh root@ip`,登录到手机.
+
+ip为手机ip, 密码为越狱后打开SSH端口设置的密码，如果没改过，默认是"alpine".
+
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-28%20%E4%B8%8B%E5%8D%886.23.06.png)
 
 登录成功:
@@ -28,7 +31,7 @@ unzip xmin_cloud.ipa -d xmin_cloud_unziped
 
 #### 3.找出xMind进程的沙盒目录Documents
 
-(1）cyctipt方法 :
+(1）cyctipt方法得到Documents目录:
 
 前提:已在手机上安装cycript命令。
 
@@ -73,7 +76,7 @@ cycript -p 1429
 /var/mobile/Containers/Data/Application/7A2AAC43-55F5-41A2-B648-43B0C2453BF2/Documents/
 ```
 
-(2)find命令方法
+(2)find命令方法得到Documents目录
 
 如果没有安装cycript,用find命令也可以找出Documents目录:
 
@@ -199,6 +202,38 @@ iTools 或其他工具，直接拖入安装
 ![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_110624.png)
 
 安装且运行成功，说明重签名没问题，接下来就是修改字符串了.
+
+
+### 修改字符串
+App的字符串要么在.strings资源文件,或者在Nib，或者在其他资源文件，或者写死在可执行程序.
+
+#### 1.字符串在.strings文件
+这种情况是最简短的，要替换字符串，直接编辑.strings文件即可.
+
+strings文件实际上就是plist文件，假设文件全名为:Localizable.strings,直接改为:Localizable.strings.plist即可用Xcode直接编辑.
+
+以另一个XX APP为例,我找到国家化文件夹en.lproj:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.33.22.png)
+
+将Localizable.strings改名为Localizable.strings.plist, 用Xcode打开:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.36.20.png)
+
+我希望他在英文界面下，"联系人"一项显示成中文，因此做如图修改.保存，文件名改回Localizable.strings,重新签名，安装打开后效果:
+
+![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_113919.png)
+
+#### 1.字符串在.nib文件
+
+编译过的nib文件无法直接编辑，研究ing...
+
+#### 1.字符串在其他资源文件
+"其他"二字范围甚广，如果app硬伤要自己开发一套字符串加载机制，是完全可行的，或者像本例子Xmind一样，核心功能是javascript写的,用的是cordova框架，体验完全原生级别. 核心逻辑在www文件夹下
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.52.36.png)
+
+经过分析与查找，发现它的字符串写死在“main.4bbfd22776.js”文件的末端:
 
 
 
