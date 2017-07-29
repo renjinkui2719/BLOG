@@ -142,7 +142,7 @@ XMind Cloud.decrypted即为砸壳后的可执行文件:
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8810.10.38.png)
 
-将'XMind Cloud.decrypted'重命名为`XMind Cloud.decrypted`,否则下一步拷贝无法成功
+将'XMind Cloud.decrypted'重命名为`XMindCloud.decrypted`,否则下一步拷贝无法成功
 
 ```
 mv "XMind Cloud.decrypted" XMindCloud.decrypted
