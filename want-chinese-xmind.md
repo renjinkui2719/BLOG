@@ -250,12 +250,66 @@ strings文件实际上就是plist文件，假设文件全名为:Localizable.stri
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%881.09.38.png)
 
 #### 4.字符串写死在程序
-另一个例子， XX App, 启动后首页如下:
+另一个例子， XX App, 启动后首页截图如下:
 
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%883.53.15.png)
 
-本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，key
-本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，与
-本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，
-获取沙盒目录:Documentts
-获取沙盒目录:
+我想把第一个Tab的标题由"音箱"改为"设备".经过分析，发现该App没有国际化字符串文件，字符串都是写死在程序中的，所以需要分析并修改可执行程序,
+
+将砸壳后的可执行程序拖入Hopper后，进行如下三步：
+
+(1)定位到TabItem的标题设置
+
+查看`[AppDelegate application:didFinishLaunchingWithOptions:]`，发现其中调用了一个`enterHome`方法，
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-28%20%E4%B8%8B%E5%8D%884.06.21.png)
+
+猜测应该是进入主页的方法，主页是个TabBarController,那么很有可能在这个方法里初始化并设置tabBar,仔细查看果然发现了设置第一个Tab 标题的代码:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-28%20%E4%B8%8B%E5%8D%884.05.58.png)
+
+标题是个常量字符串:`cfstring____1005ef520`,跳转到该字符串定义:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-28%20%E4%B8%8B%E5%8D%884.06.54.png)
+
+其中高亮选中部分为字符串实际字节，继续跳转，查看它的实际字节内容:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-28%20%E4%B8%8B%E5%8D%884.07.32.png)
+
+看到该字符串的内容字节为:'f397b17b',后面的`0000`是结束标志,'f397b17b'正是"音箱"二字的Unicode编码,那么，只要以"设备"二字的Unicode编码替换掉`f397b17b`,即可实现字符串更改，字符串的Unicode 编码可简单些如下两行代码得到:
+
+```
+NSString *s1 = @"设备";
+NSData *data = [s1 dataUsingEncoding:NSUnicodeStringEncoding];
+```
+
+比如"设备",打印data得：
+
+```
+<fffebe8b 0759>
+```
+
+前面的fffe指示该字节序列是小端存储，和可执行程序大小端模式相同。即“设备”的Unicode编码就是`be8b0759`.
+
+开始替换：
+
+用十六进制编辑工具打开可执行程序，找到`f3 97 b1 7b`:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%884.23.43.png)
+
+替换为`be 8b 07 59`：
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%884.24.09.png)
+
+保存，重签名，安装打开:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%883.52.54.png)
+
+看到“音箱”已经变为"设备",说明操作成功.
+
+遗留问题：可执行文件中，为原来"音箱"二字分配的空间有4+2留个字节，我修改为相同字节数的“设备”二字，是没问题，可是如果要改为更长的字符串，比如"我的设备"四个字，该如何进行?
+
+### 总结
+进行了最基础的ipa修改与重签名实践。
+
 
