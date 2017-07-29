@@ -1,4 +1,4 @@
-以很好用的思维导图工具Xmind为主例，试验与记录app的修改与重签名，仅作学习目的，未行不轨之事。
+以很好用的思维导图工具Xmind为主例，试验与记录app字符串的修改与重签名，仅作学习目的，未行不轨之事。
 
 ## 材料
 越狱手机一部,itunes store 下载的xMind.ipa,[砸壳工具](https://github.com/stefanesser/dumpdecrypted)(下载后编译出dumpdecrypted.dyld)，[重签名工具](https://github.com/chenhengjie123/iOS_resign_scripts).
@@ -13,6 +13,8 @@ unzip xmin_cloud.ipa -d xmin_cloud_unziped
 解压完成后，xmind_cloud_unziped文件夹应当如此: 
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-28%20%E4%B8%8B%E5%8D%886.04.24.png)
+
+进入`xmind_cloud_unziped/Payload/XMind Cloud.app`目录,删除可执行文件`XMind Cloud`,这个可执行文件是加密加壳过的，派不上用途，需要的是砸壳过的可执行文件。
 
 ## 砸壳
 #### 1.在越狱手机上安装xMind，杀掉所有其他应用，单独打开xMind.
@@ -147,12 +149,62 @@ mv "XMind Cloud.decrypted" XMindCloud.decrypted
 
 #### 6.拷贝砸壳文件
 
-用scp命令将 XMindCloud.decrypted拷贝到解压包里，同时去掉.decrypted后缀:
+用scp命令将 XMindCloud.decrypted拷贝到解压包目录`xmind_cloud_unziped/Payload/XMind\ Cloud.app/`里，同时去掉.decrypted后缀:
 
 ```shell
 scp root@192.168.2.15:/var/mobile/Containers/Data/Application/7A2AAC43-55F5-41A2-B648-43B0C2453BF2/Documents/XMindCloud.decrypted xmind_cloud_unziped/Payload/XMind\ Cloud.app/XMindCloud
 ```
+编辑Info.plist,将可执行文件名由 "XMind Cloud"改为"XMindCloud":
 
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8810.34.48.png)
+
+至此，砸壳过程完全结束，可以开始重签名，或者反汇编分析XMindCloud程序了
+
+### 重签名
+虽然目前什么都没改动，仅仅是砸了壳，但是可以立刻验证一下重签名后是否可以安装.
+
+#### 1.证书与工具
+本例用开发证书进行重签名. 将`mobileprovision`文件和`ios_resign_from_app_to_ipa`命令 拷贝到xmind_cloud_unziped同级目录下:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8810.52.36.png)
+
+到keyChain找到与该mobileprovision对应的证书，我的为:`iPhone Developer: JinKui Ren (MHR5XEJ2E4)`
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8810.48.33.png)
+
+#### 2.按需修改Bundle ID，Display Name
+如果希望设备上安装一个原来的App,和另一个重签名过的App,应当修改Info.plist中的Bundle Id值：
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8810.56.10.png)
+
+否则因为证书冲突，需要卸载掉原来的App，才能安装相同ID的重签名App。
+
+#### 2.重签名
+
+```
+ ./ios_resign_from_app_to_ipa 解压目录名 证书名 mobileprovision路径 重新名后的ipa名
+```
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.00.13.png)
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.00.32.png)
+
+成功生成ipa：
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.02.17.png)
+
+#### 3.安装测试
+iTools 或其他工具，直接拖入安装
+
+![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_110624.png)
+
+安装且运行成功，说明重签名没问题，接下来就是修改字符串了.
+
+
+
+本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，key
+本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，与
+本例用开发证书进行重签名. 将mobileprovision文件拷贝到xmind_cloud_unziped同级目录下，按需重命名一个简短一点的名字，我看的是[这篇教程](http://www.jianshu.com/p/f32e7c2c1628)，因此也像作者一样重命名为"embeded.mobileprovision"，
 获取沙盒目录:Documentts
 获取沙盒目录:
 
