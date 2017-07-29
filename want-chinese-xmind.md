@@ -199,7 +199,7 @@ scp root@192.168.2.15:/var/mobile/Containers/Data/Application/7A2AAC43-55F5-41A2
 #### 3.安装测试
 iTools 或其他工具，直接拖入安装
 
-![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_124410.png)
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%8812.52.19.png)
 
 安装且运行成功，说明重签名没问题，接下来就是修改字符串了.
 
@@ -224,16 +224,32 @@ strings文件实际上就是plist文件，假设文件全名为:Localizable.stri
 
 ![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_113919.png)
 
-#### 1.字符串在.nib文件
+#### 2.字符串在.nib文件
 
 编译过的nib文件无法直接编辑，研究ing...
 
-#### 1.字符串在其他资源文件
-"其他"二字范围甚广，如果app硬伤要自己开发一套字符串加载机制，是完全可行的，或者像本例子Xmind一样，核心功能是javascript写的,用的是cordova框架，体验完全原生级别. 核心逻辑在www文件夹下
+#### 3.字符串在其他资源文件
+"其他"二字范围甚广，如果app硬伤要自己开发一套字符串加载机制，是完全可行的，或者像本例子Xmind一样，核心功能是javascript写的,用的是cordova框架，体验完全原生级别，但是无法设置成中文界面:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%881.07.50.png)
+
+核心逻辑在www文件夹下
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.52.36.png)
 
 经过分析与查找，发现它的字符串写死在“main.4bbfd22776.js”文件的末端:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%8812.59.20.png)
+
+逐一翻译替换掉:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%881.04.44.png)
+
+重签名，安装,成功汉化:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%881.09.38.png)
+
+#### 4.字符串写死在程序
 
 
 
