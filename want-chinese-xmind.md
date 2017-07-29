@@ -220,16 +220,16 @@ strings文件实际上就是plist文件，假设文件全名为:Localizable.stri
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8A%E5%8D%8811.36.20.png)
 
-我希望他在英文界面下，"联系人"一项显示成中文，因此做如图修改.保存，文件名改回Localizable.strings,重新签名，安装打开后效果:
+我希望他在英文界面下，"联系人"一项显示成中文，因此做如图修改,保存，并将文件名改回Localizable.strings,重新签名，安装打开后效果:
 
 ![](http://oem96wx6v.bkt.clouddn.com/ScreenShot_20170729_113919.png)
 
 #### 2.字符串在.nib文件
 
-编译过的nib文件无法直接编辑，研究ing...
+编译过的nib文件无法直接编辑，修改方式待研究。
 
 #### 3.字符串在其他资源文件
-"其他"二字范围甚广，如果app硬伤要自己开发一套字符串加载机制，是完全可行的，或者像本例子Xmind一样，核心功能是javascript写的,用的是cordova框架，体验完全原生级别，但是不支持中文:
+"其他"二字范围甚广，如果app硬是要自己开发一套字符串加载机制，是完全可行的，或者像本例子Xmind一样，核心功能是javascript写的,用的是cordova框架，体验完全原生级别，但是不支持中文:
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-07-29%20%E4%B8%8B%E5%8D%881.07.50.png)
 
