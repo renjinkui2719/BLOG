@@ -4,7 +4,7 @@ async,await是ES7提出的异步解决方案，对比回调链和Promise.then链
 
 接触完毕后，深感如果在平时的iOS项目中也能像JS这般编写异步代码，那该多好。经过研究发现要实现这些特性其实并不是很困难，因此本文主旨便是描述async,await在iOS平台的实现过程，并给出了一个成果项目.
 
-##### 切换到JavaScript
+### 切换到JavaScript
 先了解在JS中,async和await究竟是怎样运用的.
 ###### 以顺序读取三个文件举例 
 假设要求顺序读取三个文件，即每读取完成一个才可以开始读取下一个
@@ -97,7 +97,8 @@ async function read3Files() {
 至此可以体会到基于async/await异步模式的清晰优雅, read3Files被标记为async,在函数内部每个异步操作的结果都可以用await来“等到”，可直接理解await含义为:"等待异步操作结果",但是这个等待过程是不阻塞的。此处的异步操作是一个Promise,由readFile函数创建并返回，当异步操作结束,promise被resolve时，await成功等到结果，而promise被reject时，await等待失败，抛出错误，并被catch到.
 
 
-##### 切换回iOS
+### 切换回iOS
+#### 1.美好的假设
 假设async/await/Promise已经在OC中支持，那么如上的读取文件列子即可这样实现:
 ```Objective-C
 - (Promise *)readFileWithPath:(NSString *)path {
@@ -176,7 +177,7 @@ typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
 }
 ```
 
-##### catch块引发的问题
+#### 2.catch块引发的问题
 先不管如何实现，假设上面提到的都是可以实现的，那么细细推敲便发现新的问题：catch机制将引发内存泄露.
 
 正如上面对出错的约定：`在某个await等待异步操作完成的过程中，如果异步操作出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.`，那么这时候的程序执行流便如下所示:
@@ -190,6 +191,10 @@ typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%885.15.50.png)
 
 如果执行流从中间断开了，那么这些释放代码永远执行不到，将造成“每逢出错必泄露”的局面。
+
+#### 3.最终假设
+
+### 实现
 
 ##### 切换回iO
 ##### 切换回iOS
