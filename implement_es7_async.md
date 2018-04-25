@@ -120,8 +120,8 @@ async function read3Files() {
 - (void async)read3Files {
     @try {
         NSData *data1 = await [self readFileWithPath:@".../path1"];
-        NSData *data2 = await [self readFileWithPath:@".../path1"];
-        NSData *data3 = await [self readFileWithPath:@".../path1"];
+        NSData *data2 = await [self readFileWithPath:@".../path2"];
+        NSData *data3 = await [self readFileWithPath:@".../path3"];
         //全部读取完成
     }
     @catch(NSError *err) {
@@ -136,8 +136,8 @@ async function read3Files() {
 - (void)read3Files {
     async(^{
         NSData *data1 = await( [self readFileWithPath:@".../path1"]);
-        NSData *data2 = await( [self readFileWithPath:@".../path1"]);
-        NSData *data3 = await( [self readFileWithPath:@".../path1"]);
+        NSData *data2 = await( [self readFileWithPath:@".../path2"]);
+        NSData *data3 = await( [self readFileWithPath:@".../path3"]);
     })
     .catch(^(error) {
         //出错处理
@@ -160,13 +160,13 @@ async function read3Files() {
 ###### (5).Promise其实已经有很好的实现:PromiseKit. 但是还可以再抽象一下：什么是一个异步操作？
 
 可以理解为:"操作的完成不阻塞当前流程的操作" 便是异步操作。 因此完全可以如下定义一个闭包类型`AsyncClosure`为异步操作
-```
+```Objective-C
 typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
 ```
 `AsyncClosure`的参数`resultCallback`作为输出操作结果的渠道，至于`AsyncClosure`内部，想要实现读取文件也好，下载数据也好，只要以非阻塞方式进行，最后通过`resultCallback`回调出结果即可. 
 
 也就是此情景下的Promise完全可以用`AsyncClosure`类型的闭包替代:
-```
+```Objective-C
 - (AsyncClosure)readFileWithPath:(NSString *)path {
     return  ^(void (^resultCallback)(id value, id error)) {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -193,8 +193,52 @@ typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
 如果执行流从中间断开了，那么这些释放代码永远执行不到，将造成“每逢出错必泄露”的局面。
 
 #### 3.最终假设
+为避免上一步提到的内存泄露问题，决定放弃catch块统一处理错误的机制，根本目的是确保异步块执行流不会从中间“异常断开”。改进的方式是:
+
+(1)每次await将返回一个Result，Result包装了异步操作的实际结果值value,和错误对象error:
+```Objective-C
+@interface Result: NSObject
+@property (nonatomic, strong, readonly) id  value;
+@property (nonatomic, strong, readonly) id  error;
+@end
+```
+(2)每一步await的错误具体要怎么处理由程序员决定，不再统一处理:
+```Objective-C
+async(^{
+    Result *result1 = await( [self readFileWithPath:@".../path1"] );
+    if (result1.error) {
+      //第1步出错
+    }
+    NSData *data1 = result1.value;
+    
+   Result *result2 = await( [self readFileWithPath:@".../path2"] );
+    if (result2.error) {
+      //第2步出错
+    }
+    NSData *data2 = result2.value;
+    
+    
+    Result *result3 = await( [self readFileWithPath:@".../path3"] );
+    if (result3.error) {
+      //第3步出错
+    }
+    NSData *data3 = result3.value;
+})
+.finally(^{
+
+})
+```
+至此，整个假设已经没有什么逻辑上的硬伤，开始着手实现.
 
 ### 实现
+```Objective-C
+async(^{
+    Result *result1 = await( [self readFileWithPath:@".../path1"] );
+    Result *result2 = await( [self readFileWithPath:@".../path2"] );
+    Result *result3 = await( [self readFileWithPath:@".../path3"] );
+});
+```
+
 
 ##### 切换回iO
 ##### 切换回iOS
