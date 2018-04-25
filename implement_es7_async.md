@@ -149,10 +149,22 @@ async function read3Files() {
 这样子就很有希望了, async/catch/fianlly链可以运用链式编程的思想实现，await只是一个普通c函数，async的参数也只是一个void (^)(void) 类型的block.
 
 (1)把传给async的代码块叫做异步块，表示块内的代码将支持await.
+
 (2)await的含义仍然是等待异步操作的结果，等待成功后赋值给data。
+
 (3)某个await等待异步操作完成的过程中，异步操作如果出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.
+
 (4)不管异步块成功执行结束，还是中间出错，finally块总会执行，方便进行一些收尾的操作.
+
 (5)Promise其实已经有很好的实现:PromiseKit. 但是还可以再抽象一下：什么是一个异步操作？
+
+可以理解为:操作的完成与结果获取不阻塞当前流程的操作便是异步操作。 因此完全可以如下定义一个闭包类型`AsyncClosure`为异步操作
+```
+typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
+```
+`AsyncClosure`的参数`resultCallback`作为输出操作结果的渠道，至于`AsyncClosure`内部，想要实现读取文件也好，下载数据也好，只要以非阻塞方式进行，最后通过`resultCallback`回调出结果即可. 
+
+也就是此情景下的Promise完全可以用`AsyncClosure`类型的闭包替代.
 
 
 ##### 切换回iO
