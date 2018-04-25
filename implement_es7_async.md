@@ -130,7 +130,7 @@ async function read3Files() {
 ```
 但事实是OC并不支持，那么如果靠自己写第三方实现，支持如上异步编程方式呢?
 
-细想要完全如上是不可能的，编译器又不是自己实现的，用尽奇淫巧技也不可能以第三方库的形式让编译器支持如上新语法,因此稍微变换一下:
+细想要完全如上是不可能的，用尽奇淫巧技也不可能以第三方库的形式让编译器支持如上新语法,因此稍微变换一下:
 ```Objective-C
 - (void)read3Files {
     async(^{
@@ -146,26 +146,46 @@ async function read3Files() {
     })
 }
 ```
-这样子就很有希望了, async/catch/fianlly链可以运用链式编程的思想实现，await只是一个普通c函数，async的参数也只是一个void (^)(void) 类型的block.
+这样子就很有希望了, async/catch/fianlly链可以运用链式编程的思想实现，await只是一个普通c函数，async的参数也只是一个void (^)(void) 类型的block.因此基于完全可以实现的假设下，作如下约定:
 
 ###### (1).把传给async的代码块叫做异步块，表示块内的代码将支持await.
 
 ###### (2).await的含义仍然是等待异步操作的结果，等待成功后赋值给data。
 
-###### (3).某个await等待异步操作完成的过程中，异步操作如果出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.
+###### (3).在某个await等待异步操作完成的过程中，如果异步操作出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.
 
 ###### (4).不管异步块成功执行结束，还是中间出错，finally块总会执行，方便进行一些收尾的操作.
 
 ###### (5).Promise其实已经有很好的实现:PromiseKit. 但是还可以再抽象一下：什么是一个异步操作？
 
-可以理解为:操作的完成与结果获取不阻塞当前流程的操作便是异步操作。 因此完全可以如下定义一个闭包类型`AsyncClosure`为异步操作
+可以理解为:"操作的完成不阻塞当前流程的操作" 便是异步操作。 因此完全可以如下定义一个闭包类型`AsyncClosure`为异步操作
 ```
 typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
 ```
 `AsyncClosure`的参数`resultCallback`作为输出操作结果的渠道，至于`AsyncClosure`内部，想要实现读取文件也好，下载数据也好，只要以非阻塞方式进行，最后通过`resultCallback`回调出结果即可. 
 
-也就是此情景下的Promise完全可以用`AsyncClosure`类型的闭包替代.
+也就是此情景下的Promise完全可以用`AsyncClosure`类型的闭包替代:
+```
+- (AsyncClosure)readFileWithPath:(NSString *)path {
+    return  ^(void (^resultCallback)(id value, id error)) {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSData *data =  [NSData dataWithContentsOfFile:path];
+            resultCallback(data, [NSError new]);
+        });
+    };
+}
+```
 
+##### catch块引发的问题
+先不管如何实现，假设上面提到的都是可以实现的，那么细细推敲便发现新的问题：catch机制将引发内存泄露.
+
+正如上面对出错的约定：`在某个await等待异步操作完成的过程中，如果异步操作出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.`，那么这时候的程序执行流便如下所示:
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%884.49.40.png)
+如上图所示,异步块首先分配了一个对象object,然后进行三个await操作，假设在第二个await的过程中，发生错误，那么程序执行流直接略过后面的所有代码，进入catch块处理错误。
+
+看起来很美，实际上这时不管在MRC，还是ARC下，object都无法得到释放。在ARC下，大部分情况下编译器为object生成的释放代码都处于代码块末端：
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%885.15.50.png)
+如果执行流从中间断开了，那么这些释放代码永远执行不到，将造成“每逢出错必泄露”的局面。
 
 ##### 切换回iO
 ##### 切换回iOS
