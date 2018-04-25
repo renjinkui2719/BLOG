@@ -238,6 +238,11 @@ async(^{
     Result *result3 = await( [self readFileWithPath:@".../path3"] );
 });
 ```
+为满足async/await的定义. 异步块在执行的过程中要满足如下流程:
+正常执行
+await调用 -- 等待异步操作完成 -- 得到结果value与error -- Result -- await返回
+正常执行
+
 
 
 ##### 切换回iO
