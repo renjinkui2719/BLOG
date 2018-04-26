@@ -734,7 +734,7 @@ iOS 版本readFile：
     return [AnyPromise promiseWithAdapterBlock:^(PMKAdapter  _Nonnull adapter) {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             NSData *data =  [NSData dataWithContentsOfFile:path];
-            resultCallback(data, [NSError new]);
+            adapter(data, [NSError new]);
         });
     }];
 }
