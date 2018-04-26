@@ -287,9 +287,75 @@ executor(function *() {
   }
 });
 ```
-此时已经把callback模式改进为同步模式,其思路总结起来就是:
+此时已经把callback模式改进为同步模式,暂且把传给执行器的生成器函数叫做"异步函数"。执行过程总结起来就是:
 
-异步函数内通过但凡遇到异步操作，就通过yield交给执行器, 执行器但凡拿到异步操作，就发起该操作，拿到结果后再交换结果数据给异步函数（生成器）,那么在异步函数内，就可以同步风格编写异步代码，因为有了执行器在背后，异步函数内的yield具有了“你给我异步操作,我还你实际结果”的能力.
+异步函数但凡遇到异步操作，就通过yield交给执行器, 执行器但凡拿到异步操作，就发起该操作，拿到实际结果后再将其交换给异步函数。那么在异步函数内，就可以同步风格编写异步代码，因为有了执行器在背后，异步函数内的yield就具有了“你给我异步操作,我还你实际结果”的能力.
+
+Promoise同样可作为异步操作:
+```JS
+function readFile(name) {
+  //返回一个Promise作为异步操作
+  return new Promise((resolve, reject) => {
+    fs.readFile(name, (err, data) => {
+        if (err) reject(err);
+        else resolve(data);
+    });
+  });
+}
+```
+在执行器中新增识别Promise的代码
+```JS
+function executor(generator) {
+  //创建迭代器
+  let iterator = generator();
+  //开始第一次迭代
+  let result = iterator.next();
+
+  let nextStep = function() {
+    //迭代还没结束
+    if (!result.done) {
+      //从生成器拿到的是一个闭包异步操作
+      if (typeof result.value === "function") {
+        //发起异步操作
+        result.value((err, data) => {
+          if(err) {
+            //在生成器内部引发异常
+            iterator.throw(err);
+          }
+          else {
+            //得到结果值,传给生成器
+            result = iterator.next(data);
+            //继续下一步迭代
+            nextStep();
+          }
+        });
+      }
+      //从生成器拿到的是一个Promise异步操作
+      if (result.value instanceof Promise) {
+        //执行该Promise
+        result.value.then(data => {
+          //得到结果值,传给生成器
+          result = iterator.next(data);
+          //继续下一步迭代
+          nextStep();
+        }).catch(err => {
+          //在生成器内部引发异常
+          iterator.throw(err);
+        });
+      }
+      //从生成器拿到的是一个普通对象
+      else {
+        //什么都不做，直接传回给生成器
+        result = iterator.next(result.value);
+        //继续下一步迭代
+        nextStep();
+      }
+    }
+  };
+  //开始后续迭代
+  nextStep();
+}
+```
 
 第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
 
