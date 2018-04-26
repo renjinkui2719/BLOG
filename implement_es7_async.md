@@ -192,8 +192,8 @@ console.log(result);
  ###### 生成器是一个函数，直接调用得到其对应的迭代器，用以控制生成器的逐步执行;
  ###### 生成器内部通过yield语法向迭代器返回值，而且可以多次返回,并多次恢复执行，有别于传统函数"返回便消亡"的特点;
  ###### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器苏醒后的右值.
- 
- 
+
+
 #### 2.通过生成器与迭代器改进异步编程
 回想本文开头提到的读取文件例子,如果以callback模式编写:
 ```JS
@@ -424,7 +424,6 @@ void generator() {
 }
 
 - (id)initWithFunc:(void (*)(void))func;
-
 - (Result *)next;
 - (Result *)next:(id)value;
 @end
@@ -454,34 +453,33 @@ Result *result = [iterator next: value];
 
 (2)当前寄存器信息，包括当前栈帧栈顶。
 
-而且 中断后到恢复的这段时间内，应当确保yield以及生成器generator的栈帧不会被销毁.
+##### 而且 中断后到恢复的这段时间内，应当确保yield以及生成器generator的栈帧不会被销毁.
 
-而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,恢复跳转到保存的指令地址处继续执行.
+而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,并跳转到保存的指令地址处继续执行.
 
 上述过程描述起来看似简单，但是如果要自己写汇编代码去保存与恢复现场，并适配各种平台，要保证稳定性还是很难的，好在有C标准库提供的现成利器:setjmp/longjmp。
 
-setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函数内跳转，setjmp/longjmp实现远程跳转给予的就是保存现场与恢复现场,非常符合此处的需求.
+setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函数内跳转，setjmp/longjmp实现远程跳转基于的就是保存现场与恢复现场的机制,非常符合此处的需求.
 
-#### 迭代器实现
-迭代器与生成器通过next方法进行交互，在next方法内部将控制流切换到生成器，生成器再通过yield将返回值交给迭代器，并将执行流切换回next方法.
+#### 实现思路
 
-next方法拿到这个值，正常返回给调用者。
+根据前面对生成器，迭代器的定义及需求推敲整理出如下的实现思路:
 
-为了确保next方法返回后，生成器的执行栈不被销毁，因此生成器方法的执行需要在一个不被释放的新栈上进行。
+(1) 迭代器通过next方法与生成器进行交互，在next方法内部会将控制流切换到生成器，生成器调用yield设置传给迭代器的返回值,并将执行流切换回next方法.
 
-通过中介wrapper调用生成器，可以检测到生成器执行结束的事件，然后wrapper切回 next 方法，并设置done为YES，迭代结束.
+(2) next方法拿到这个值，正常返回给调用者。
+
+(3) 为了确保next方法返回后，生成器的执行栈不被销毁，因此生成器方法的执行需要在一个不被释放的新栈上进行。
+
+(4) 虽然next主要通过恢复现场方式切入生成器，但是首次还是需要调用方式来进入生成器，通过中介wrapper调用生成器的方式，可以检测到生成器执行结束的事件，然后wrapper切回 next 方法，并设置done为YES，迭代结束.
 
 整个流程如下:
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-26%20%E4%B8%8B%E5%8D%885.01.21.png)
 
 
-整个
 
-而生成器执行结束后，通过返回到wrapper函数，wrapper再切回到next方法。
-迭代器与生成器通过next方法进行交互，在next方法内部将控制流切换到生成器，生成器再通过yield将返回值交给迭代器，并将执行流切换回next方法；next方法拿到这个值，正常返回给调用者，
-
-为了确保next方法返回后，生成器的执行栈不被销毁，因此生成器方法的执行需要在新栈进行,而生成器执行结束后，通过返回到wrapper函数，wrapper再切回到next方法。
+乍一看好大一坨，但是只要跟着箭头流程走，思路将很快理清。
 
 
 
@@ -495,13 +493,17 @@ next方法拿到这个值，正常返回给调用者。
     BOOL _ev_entry_valid; //指示生成器现场是否可用
     void *_stack; //为生成器新分配的栈
     int _stack_size; //为生成器新分配的栈大小
-    void (*_func)(void);
+    void (*_func)(void);//迭代器函数指针
     BOOL _done; //是否迭代结束
-    id _value; //生成器传给的值
+    id _value; //生成器通过yield传回的值
 }
+- (id)initWithFunc:(void (*)(void))func;
+- (Result *)next;
+- (Result *)next:(id)value;
+@end
 ```
 
-为生成器分配新栈,因为next方法是要返回的，如果直接在next自己的调用栈上调用生成器，那么next返回后，生成器就算保护了寄存器现场，它的栈帧也被破坏了，再次恢复执行将产生无法预料的结果.
+为生成器分配新栈,正如前面所述，在迭代器和生成器的生命周期中，next方法的每次迭代是要立即返回的，如果直接在next自己的调用栈上调用wrapper，wrapper再调用生成器，那么next返回后，生成器就算保护了寄存器现场，它的栈帧也被破坏了，再次恢复执行将产生无法预料的结果.
 
 ```Objective-C
 //默认为生成器分配256K的执行栈
@@ -509,10 +511,11 @@ next方法拿到这个值，正常返回给调用者。
 
 - (id)init {
     if (self = [super init]) {
+      //分配一块内存作为生成器的运行栈
         _stack = malloc(DEFAULT_STACK_SIZE);
         memset(_stack, 0x00, DEFAULT_STACK_SIZE);
         _stack_size = DEFAULT_STACK_SIZE;
-        
+        //jmp_buf类型来自C标准库<setjmp.h>
         _ev_leave = malloc(sizeof(jmp_buf));
         memset(_ev_leave, 0x00, sizeof(jmp_buf));
         _ev_entry = malloc(sizeof(jmp_buf));
@@ -522,19 +525,19 @@ next方法拿到这个值，正常返回给调用者。
 }
 ```
 
-next方法:
+实现next方法:
 ```Objective-C
-#define JMP_CONTINUE 1
-#define JMP_DONE 2
+#define JMP_CONTINUE 1//生成器还可被继续迭代
+#define JMP_DONE 2//生成器已经执行结束，迭代器应该结束
 
 - (Result *)next:(id)value {
     if (_done) {
-       //迭代器已结束
+       //迭代器已结束,则每次调用next都返回最后一次结果
        return [Result resultWithValue:_value error:_error done:_done];
     }    
-    //保存next执行环境
+    //保存next当前环境
     int leave_value = setjmp(_ev_leave);
-    //非跳转返回
+    //非恢复执行
     if (leave_value == 0) {
         //已经设置了生成器进入点
         if (_ev_entry_valid) {
@@ -553,7 +556,7 @@ next方法:
             sp -= 256;
             //对齐sp
             sp &= ~0x07;
-            
+            //修改栈指针sp,指向新栈
 #if defined(__arm__)
             asm volatile("mov sp, %0" : : "r"(sp));
 #elif defined(__arm64__)
@@ -567,11 +570,11 @@ next方法:
             [self wrapper];
         }
     }
-    //生成器内部跳转返回
+    //从生成器内部恢复next
     else if (leave_value == JMP_CONTINUE) {
         //还可以继续迭代
     }
-    //生成器wrapper跳转返回
+    //从生成器wrapper恢复next
     else if (leave_value == JMP_DONE) {
         //生成器结束，迭代完成
         _done = YES;
@@ -580,9 +583,10 @@ next方法:
     return [RJResult resultWithValue:_value error:_error done:_done];
 }
 ```
-调用迭代器方法next时,先保存next
 
-为保证生成器执行完后,
+
+如果没有中介wrapper,那么迭代器返回将会造成崩溃，因为迭代器的运行栈和生成器是分开的，生成器内部执行return语句了，返回后的栈空间将是未定义的，很有可能造成非法内存访问而崩溃.中介wrapper很好地解决了这个问题:
+
 ```Objective-C
 - (void)wrapper {
     if (_func) {
@@ -591,7 +595,90 @@ next方法:
     //从生成器返回，说明生成器完全执行结束
     //直接返回到迭代器设置的返回点
     self.value = nil;
-    
+    //恢复next
+    longjmp(_ev_leave, JMP_DONE);
+    //不会到此
+    assert(0);
+}
+```
+
+通过中介wrapper调用方式进入生成器，生成器最终返回后将正确返回到wrapper末尾继续执行，而wrapper也就知道，此时迭代应该结束了，因此以longjmp方式恢复next的现场，并设置恢复值为JMP_DONE,next被恢复后拿到这个值就知道生成器执行结束，迭代应该结束了.
+
+
+
+yield的实现就更加简单，保存当前现场，将value值传递给迭代器对象，然后恢复迭代器next方法即可,而从next恢复yield的现场后，yield再取迭代器设置的新值返回给生成器内部:
+
+```objective-c
+id yield(id value) {
+    //获取当前线程正在迭代的生成器
+    Iterator *iterator = [IteratorStack top];
+    return [iterator yield: value];
+}
+
+- (id)yield:(id)value {
+    //设置生成器的现场保护标志
+    _ev_entry_valid = YES;
+    //现场保护
+    if (setjmp(_ev_entry) == 0) {
+        //现场保护完成
+        //给迭代器赋值
+        self.value = value;
+        //恢复迭代器next现场
+        longjmp(_ev_leave, JMP_CONTINUE);
+    }
+    //从迭代器next恢复此现场
+    //返回迭代器传进来的新值,或者默认值value
+    return self.value;
+}
+```
+
+这里的IteratorStack是一个线程本地存储的栈，栈顶永远是当前线程正在活动的迭代器，具体实现可以参考后边给出的结果项目。
+
+
+
+至此已经实现了c函数版本的生成器，简单改变即可扩展到OC方法，block.首先是迭代器支持新的初始化方法:
+
+```objective-c
+@interface Iterator : NSObject
+{
+    int *_ev_leave; //迭代器在next方法内保存的现场
+    int *_ev_entry; //生成器通过yield保存的现场
+    BOOL _ev_entry_valid; //指示生成器现场是否可用
+    void *_stack; //为生成器新分配的栈
+    int _stack_size; //为生成器新分配的栈大小
+    void (*_func)(void);//迭代器函数指针
+    BOOL _done; //是否迭代结束
+    id _value; //生成器通过yield传回的值
+    id _target;//生成器方法所在对象
+    SEL _selector;//生成器方法selector
+    id _block;//生成器block
+    NSMutableArray *_args;//传递给生成器的初始参数
+}
+- (id)initWithFunc:(void (*)(void))func;
+- (id)initWithTarget:(id)target selector:(SEL)selector;
+- (id)initWithBlock:(id)block;
+- (Result *)next;
+- (Result *)next:(id)value;
+@end
+```
+
+wrapper支持新的函数调用方式:
+
+```objective-c
+- (void)wrapper {
+    if (_func) {
+        _func();
+    }
+    else if (_target && _selector) {
+       ((void (*)(id, SEL))objc_msgSend)(_target, _selector);
+    }
+    else if (_block) {
+        ((void (^)(void))_block)();
+    }
+    //从生成器返回，说明生成器完全执行结束
+    //直接返回到迭代器设置的返回点
+    self.value = nil;
+    //恢复next
     longjmp(_ev_leave, JMP_DONE);
     //不会到此
     assert(0);
@@ -599,168 +686,57 @@ next方法:
 ```
 
 
-是
 
+#### 3.通过生成器与迭代器改进异步编程
 
+正如前面描述的JS下的改进方法，现在可以用实现的生成器与迭代器来改进iOS的异步编程.
 
+首先定义异步操作为如下闭包:
 
-而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,恢复跳转到保存的指令地址处继续执行.guo
-而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,恢复跳转到保存的指令地址处继续执行.
+```objective-c
+typedef void (^AsyncCallback)(id  value, id  error);
+typedef void (^AsyncClosure)(AsyncCallback  callback);
+```
 
-setjmp和longjmp
+跟JS下的定义一样，这种闭包内部进行任何异步调用，最终以callback输出error和value即可.
 
-对于如下生成器:
-```C
-void generator() {
-    yield(value);
-    yield(value);
+同时PromiseKit提供的AnyPromise也可以作为异步操作.
+
+iOS 版本readFile：
+
+```objective-c
+- (AsyncClosure)readFileWithPath:(NSString *)path {
+    return  ^(void (^resultCallback)(id value, id error)) {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSData *data =  [NSData dataWithContentsOfFile:path];
+            resultCallback(data, [NSError new]);
+        });
+    };
 }
-```
-在执行进入yield后，调用栈布局应该如下:
-
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-26%20%E4%B8%8B%E5%8D%882.32.39.png)
 
 
-
-
-
-
-假设函数foo定义如下:
-```Objective-C
-void foo() {
-    int a = 0x10;
-    int b = 0x20;
-    int r = a + b;
-    printf("a + b = %d", r);
+- (AnyPromise *)readFileWithPath:(NSString *)path {
+    return [AnyPromise promiseWithAdapterBlock:^(PMKAdapter  _Nonnull adapter) {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSData *data =  [NSData dataWithContentsOfFile:path];
+            resultCallback(data, [NSError new]);
+        });
+    }];
 }
-```
-对应的ARM32位汇编:
-```asm
-foo:
-    0x82448 <+0>:  push   {r7, lr}
-    0x8244a <+2>:  mov    r7, sp
-    0x8244c <+4>:  sub    sp, #0x10
-    0x8244e <+6>:  movw   r0, #0x37bf
-    0x82452 <+10>: movt   r0, #0x0
-    0x82456 <+14>: add    r0, pc;   ;定位常量字符串: "a + b = %d"
-    0x82458 <+16>: movs   r1, #0x20 
-    0x8245a <+18>: movs   r2, #0x10 
-    0x8245c <+20>: str    r2, [sp, #0xc] ;a = 0x10
-    0x8245e <+22>: str    r1, [sp, #0x8] ;b = 0x10
-    0x82460 <+24>: ldr    r1, [sp, #0xc]
-    0x82462 <+26>: ldr    r2, [sp, #0x8]
-    0x82464 <+28>: add    r1, r2  ;r = a + b
-    0x82466 <+30>: str    r1, [sp, #0x4]
-    0x82468 <+32>: ldr    r1, [sp, #0x4]
-    0x8246a <+34>: blx    0x84400    ;调用printf
-    0x8246e <+38>: str    r0, [sp]
-    0x82470 <+40>: add    sp, #0x10
-    0x82472 <+42>: pop    {r7, pc}
 
 ```
-假设执行指令
-```
-0x82458 <+16>: movs   r1, #0x20 
+
+执行器executor：
+
+```objective-c
+
 ```
 
 
 
 
-第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
 
-```dia
-`
 
-先了解在JS中,async和await究竟是怎样运用的.
-###### 以顺序读取三个文件举例 
-假设要求顺序读取三个文件，即每读取完成一个才可以开始读取下一个
-
-(1).基于callback
-```JavaScript
-var fs = require('fs');
-
-function readFile(name, callback) {
-  //异步读取文件
-  fs.readFile(name, (err, data) => {
-     callback(err, data);
-  });
-}
-
-function read3Files() {
-  //读取第1个文件
-  readFile('file1.txt', (err, data) => {
-    //读取第2个文件
-    readFile('file2.txt', (err, data) => {
-      //读取第3个文件
-      readFile('file3.txt', (err, data) => {
-        //3个文件读取完毕
-      });
-    });
-  });
-}
-
-read3Files();
-```
-(2)基于Promise
-```JavaScript
-function readFile(name) {
-  return new Promise((resolve, reject) => {
-    //异步读取文件
-    fs.readFile(name, (err, data) => {
-       if (err) reject(err);
-       else resolve(data);
-    });
-  });
-}
-
-function read3Files() {
-  //读取第1个文件
-  readFile('file1.txt')
-  .then(data => {
-    //读取第2个文件
-    return readFile('file2.txt');
-  })
-  .then(data => {
-    //读取第3个文件
-    return readFile('file3.txt');
-  })
-  .then(data => {
-    //3个文件读取完毕
-  })
-  .catch(error => {
-    //读取出错
-  });
-}
-```
-(3)基于async,await
-```JavaScript
-function readFile(name) {
-  return new Promise((resolve, reject) => {
-    //异步读取文件
-    fs.readFile(name, (err, data) => {
-        if (err) reject(err);
-        else resolve(data);
-    });
-  });
-}
-
-async function read3Files() {
-  try {
-      //读取第1个文件
-      let data1 = await readFile('file1.txt');
-      //读取第2个文件
-      let data2 = await readFile('file2.txt');
-      //读取第3个文件
-      let data3 = await readFile('file3x.txt');
-      //3个文件读取完毕
-    } catch (error) {
-       //读取出错
-    }
-}
-
-```
-
-至此可以体会到基于async/await异步模式的清晰优雅, read3Files被标记为async,在函数内部每个异步操作的结果都可以用await来“等到”，可直接理解await含义为:"等待异步操作结果",但是这个等待过程是不阻塞的。此处的异步操作是一个Promise,由readFile函数创建并返回，当异步操作结束,promise被resolve时，await成功等到结果，而promise被reject时，await等待失败，抛出错误，并被catch到.
 
 
 ### 切换回iOS
