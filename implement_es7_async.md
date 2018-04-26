@@ -85,7 +85,7 @@ function read3Files() {
 
 ### 暂时继续讨论JavaScript
 
-#### 生成器与迭代器
+#### 1.生成器与迭代器
 要明白async/await的机制及运用,需从生成器与迭代器逐步说起.在ES6中，生成器是一个函数，和普通函数的区别是:
 
 ##### (1)生成器函数function关键字后多了个*:
@@ -109,7 +109,7 @@ let iterator = numbers();
 
 let result = iterator.next();
 ```
-每一次next调用将得到结果result, result对象包含两个属性:`value`和`done`.value表示此次迭代得到结果值,done表示是否迭代结束.
+每一次next调用将得到结果result, result对象包含两个属性:`value`和`done`.value表示此次迭代得到的结果值,done表示是否迭代结束.
 比如此例:
 ```JS
 function *numbers() {
@@ -185,7 +185,7 @@ console.log(result);
 //输出 => { value: undefined, done: true }
 ```
 
-可见通过迭代器可以与生成器“互相交换数据”，生成器通过yield返回数据A给迭代器，而通过迭代器可以把数据B传给生成器，让此yied语句苏醒后以B作为右值. 
+##### 可见通过迭代器可与生成器“互相交换数据”，生成器通过yield返回数据A给迭代器并中断，而通过迭代器又可以把数据B传给生成器并让此yied语句苏醒且以B作为右值. 这个特性是下一步"改进异步编程"的重要基础.
 
 至此已基本了解了生成器与迭代器的语法与运用,总结起来:
 
@@ -194,7 +194,7 @@ console.log(result);
  ###### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器苏醒后的右值.
  
  
-#### 通过生成器与迭代器改进异步编程
+#### 2.通过生成器与迭代器改进异步编程
 回想本文开头提到的读取文件例子,如果以callback模式编写:
 ```JS
 function readFile(name, callback) {
@@ -217,7 +217,76 @@ function read3Files() {
   });
 }
 ```
+基于前面起到的"与生成器交换数据"的特性,可以如下重新思考:
 
+(1)把读取文件这个动作封装为一个异步操作，通过callback输出结果:err和data.
+
+(2)把read3Files改变为生成器,内部通过yield返回异步操作给执行器.
+
+(3)执行器的通过迭代器接收read3Files返回的异步操作,拿到异步操作后，发起该异步操作，得到结果后再“交换”给生成器read3Files.
+
+即:
+```JS
+function readFile(name) {
+  //返回一个闭包作为异步操作
+  return function(callback) {
+    fs.readFile(name, (err, data) => {
+       callback(err, data);
+    });
+  };
+}
+
+function executor(generator) {
+  //创建迭代器
+  let iterator = generator();
+  //开始第一次迭代
+  let result = iterator.next();
+
+  let nextStep = function() {
+    //迭代还没结束
+    if (!result.done) {
+      //从生成器拿到的是一个异步操作
+      if (typeof result.value === "function") {
+        //发起异步操作
+        result.value((err, data) => {
+          if(err) {
+            //在生成器内部引发异常
+            iterator.throw(err);
+          }
+          else {
+            //得到结果值,传给生成器
+            result = iterator.next(data);
+            //继续下一步迭代
+            nextStep();
+          }
+        });
+      }
+      //从生成器拿到的是一个普通对象
+      else {
+        //什么都不做，直接传回给生成器
+        result = iterator.next(result.value);
+        //继续下一步迭代
+        nextStep();
+      }
+    }
+  };
+  //开始后续迭代
+  nextStep();
+}
+
+executor(function *() {
+  try {
+    //读取第1个文件
+    let data1 = yield readFile('file1.txt');
+    //读取第2个文件
+    let data2 = yield readFile('file2x.txt');
+    //读取第3个文件
+    let data3 = yield readFile('file3.txt');
+  } catch (e) {
+    //读取出错
+  }
+});
+```
 
 
 第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
