@@ -377,9 +377,77 @@ await表示等待异步操作的实际结果。
 
 
 ### 回到iOS
-光描述JS生成器，迭代器，async,await就花了如此大篇幅，不为别的，就因为在iOS上将以它们的JS特性为目标，最终实现OC版的迭代器，生成器，async,await，虽然是OC版，但是在Swift项目中也可以正常使用.
+光描述JS生成器，迭代器，async,await就花了如此大篇幅，不为别的，就因为在iOS上将以它们的JS特性为目标，最终实现OC版的迭代器，生成器，async,await，虽然是OC版.
 
-#### 1.实现生成器
+#### 1.实现生成器与迭代器
+暂时不要在意怎么实现的细节,既然是以前面描述的特性为目标，则可以根据其特性先做如下定义:
+
+先定义yield如下:
+```Objective-C
+id yield(id value);
+```
+yield接受一个对象value作为返回给迭代器的值，同时返回一个迭代器设置的新值或者原本值value.
+
+以及每次迭代的Result:
+```Objective-C
+@interface Result: NSObject
+@property (nonatomic, strong, readonly) id value;
+@property (nonatomic, readonly) BOOL done;
+@end
+```
+value表示迭代的结果，为yield返回的对象，或者nil. done指示是否迭代结束.
+
+根据前面描述的生成器特性,那么在OC里，生成器首先应该是一个C函数/OC方法/block,且内部通过调用yield来返回Result对象给迭代器:
+```Objective-C
+void generator() {
+    yield(value);
+    yield(value);
+}
+
+- (void)generator {
+    yield(value);
+    yield(value);
+}
+
+^{
+    yield(value);
+    yield(value);
+}
+```
+实际上不论是OC方法，还是block,底层调用时都与调用C函数无异，所以只要实现了C函数版生成器，其实现机制将也无缝适用于OC方法，block.
+
+迭代器定义:
+```Objective-C
+@interface Iterator : NSObject
+{
+    void (*_func)(void);
+}
+
+- (id)initWithFunc:(void (*)(void))func;
+
+- (Result *)next;
+- (Result *)next:(id)value;
+@end
+```
+迭代器的创建无法做到像JS一样直接调用生成器即可创建，需要显式创建:
+
+```Objective-C
+void generator() {
+    yield(value);
+    yield(value);
+}
+
+Iterator *iterator = [[Iterator alloc] initWithFunc: generator];
+```
+然后就可以像JS一样调用next来进行迭代:
+```
+Result *result = iterator.next;
+//迭代并传值
+Result *result = [iterator next: value];
+```
+
+
+
 
 
 第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
