@@ -5,6 +5,72 @@ async,await是ES7提出的异步解决方案，对比回调链和Promise.then链
 接触完毕后，深感如果在平时的iOS项目中也能像JS这般编写异步代码，那该多好。经过研究发现要实现这些特性其实并不是很困难，因此本文主旨便是描述async,await在iOS平台的实现过程，并给出了一个成果项目.
 
 ### 切换到JavaScript
+
+#### 迭代器与生成器
+要明白async/await的机制及运用,需从生成器与迭代器逐步说起.在ES6中，生成器是一个函数，和普通函数的区别是:
+
+(1)生成器函数function关键字后多了个*:
+```JS
+function *numbers() {
+}
+```
+
+(2)生成器函数内可以yield语法多次返回值:
+```JS
+function *numbers() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+```
+
+(3)直接调用生成器函数得到的是一个迭代器，通过迭代器的next方法控制生成器的执行:
+```JS
+let iterator = numbers();
+
+let result = iterator.next();
+```
+每一次next调用将得到结果result, result对象包含两个属性:`value`和`done`.value表示此次迭代得到结果值,done表示是否迭代结束.
+比如此例:
+```JS
+let iterator = numbers();
+//第1次迭代
+let result = iterator.next();
+console.log(result);
+//输出 => { value: 1, done: false }
+
+//第2次迭代
+result = iterator.next();
+console.log(result);
+//输出 => { value: 2, done: false }
+
+//第3次迭代
+result = iterator.next();
+console.log(result);
+//输出 => { value: 3, done: false }
+
+//第4次迭代
+result = iterator.next();
+console.log(result);
+//输出 => { value: undefined, done: true }
+```
+
+第1次调用next,生成器numbers开始执行,执行到第一个yield语句时，numbers将中断，并将结果值`1`返回给迭代器，由于numbers并没有执行完，所以done为false.
+
+第2次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`2`返回给迭代器，由于numbers并没有执行完，所以done为false.
+
+第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
+
+第4次调用next,生成器numbers从上次中断的位置恢复执行,此时已是函数尾，numbers将直接return, 由于numbers已经执行完成，所以done为true, 由于numbers并没有显式地返回任何值，因此此次迭代value为undefined.
+
+到此迭代结束，此后通过此迭代器的next方法，都将得到相同的结果`{ value: undefined, done: true }`
+
+
+第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
+
+```dia
+`
+
 先了解在JS中,async和await究竟是怎样运用的.
 ###### 以顺序读取三个文件举例 
 假设要求顺序读取三个文件，即每读取完成一个才可以开始读取下一个
