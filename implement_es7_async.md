@@ -81,7 +81,7 @@ function read3Files() {
   });
 }
 ```
-对比足见aync/await模式的优雅与简洁,接触完毕后，深感如果在iOS项目中也能像JS这般编写异步代码真是极好。经过研究发现要在iOS平台实现这些特性其实并不是很困难，因此本文主旨便是描述async,await在iOS平台的实现过程，并给出了一个成果项目.
+对比可见aync/await模式的优雅与简洁。接触完毕后，深感如果在iOS项目中也能像JS这般编写异步代码也是极好。经过研究发现要在iOS平台实现这些特性其实并不是很困难，因此本文主旨便是描述async,await在iOS平台的实现过程，并给出了一个成果项目.
 
 ### 暂时继续讨论JavaScript
 
@@ -109,8 +109,8 @@ let iterator = numbers();
 
 let result = iterator.next();
 ```
-每一次next调用将得到结果result, result对象包含两个属性:`value`和`done`.value表示此次迭代得到的结果值,done表示是否迭代结束.
-比如此例:
+每一次next调用将得到结果result, result对象包含两个属性:`value`和`done`.  value表示此次迭代得到的结果值,done表示是否迭代结束.
+比如:
 ```JS
 function *numbers() {
     yield 1;
@@ -185,13 +185,13 @@ console.log(result);
 //输出 => { value: undefined, done: true }
 ```
 
-##### 可见通过迭代器可与生成器“互相交换数据”，生成器通过yield返回数据A给迭代器并中断，而通过迭代器又可以把数据B传给生成器并让此yied语句苏醒且以B作为右值. 这个特性是下一步"改进异步编程"的重要基础.
+##### 可见通过迭代器可与生成器“互相交换数据”，生成器通过yield返回数据A给迭代器并中断，而通过迭代器又可以把数据B传给生成器 并 让yied语句苏醒且以B作为右值. 这个特性是下一步"改进异步编程"的重要基础.
 
 至此已基本了解了生成器与迭代器的语法与运用,总结起来:
 
  ###### 生成器是一个函数，直接调用得到其对应的迭代器，用以控制生成器的逐步执行;
  ###### 生成器内部通过yield语法向迭代器返回值，而且可以多次返回,并多次恢复执行，有别于传统函数"返回便消亡"的特点;
- ###### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器苏醒后的右值.
+ ###### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器yield语句苏醒后的右值.
 
 
 #### 2.通过生成器与迭代器改进异步编程
@@ -217,13 +217,13 @@ function read3Files() {
   });
 }
 ```
-基于前面起到的"与生成器交换数据"的特性,拓展出新思路:
+基于前面起到的"通过迭代器与生成器交换数据"的特性,拓展出新思路:
 
 (1)把读取文件这个动作封装为一个异步操作，通过callback输出结果:err和data.
 
 (2)把read3Files改变为生成器,内部通过yield返回异步操作给执行器(执行器第3步描述).
 
-(3)执行器通过迭代器接收read3Files返回的异步操作,拿到异步操作后，发起该异步操作，得到结果后再“交换”给生成器read3Files.
+(3)执行器通过迭代器接收read3Files返回的异步操作,拿到异步操作后，发起该异步操作，得到结果后再其“交换”给生成器read3Files内的yield.
 
 即:
 ```JS
@@ -236,6 +236,7 @@ function readFile(name) {
   };
 }
 
+//执行器
 function executor(generator) {
   //创建迭代器
   let iterator = generator();
@@ -274,6 +275,10 @@ function executor(generator) {
   nextStep();
 }
 
+```
+而read3Files改进为:
+
+```js
 executor(function *() {
   try {
     //读取第1个文件
@@ -287,11 +292,12 @@ executor(function *() {
   }
 });
 ```
+
 此时已经把callback模式改进为同步模式。
 
 暂且把传给执行器的生成器函数叫做"异步函数"，执行过程总结起来就是:
 
-异步函数但凡遇到异步操作，就通过yield交给执行器, 执行器但凡拿到异步操作，就发起该操作，拿到实际结果后再将其交还给异步函数。那么在异步函数内，就可以同步风格编写异步代码，因为有了执行器在背后，异步函数内的yield就具有了“你给我异步操作,我还你实际结果”的能力.
+异步函数但凡遇到异步操作，就通过yield交给执行器; 执行器但凡拿到异步操作，就发起该操作，拿到实际结果后再将其交换给异步函数。那么在异步函数内，就可以同步风格编写异步代码，因为有了执行器在背后运作，异步函数内的yield就具有了“你给我异步操作,我还你实际结果”的能力.
 
 Promoise同样可作为异步操作:
 ```JS
@@ -341,10 +347,10 @@ function executor(generator) {
 }
 ```
 
-到此已经成功把异步编程化为同步风格，但或许有个疑问:这个例子倒是化为同步风格了，但是那个执行器executor看起来好大一坨，并不优雅.实际上执行器当然是复用的，不用每次都实现执行器.
+到此已经成功把异步编程化为同步风格，但或许有个疑问:这个例子倒是化异步为同步风格了，但是那个执行器executor看起来好大一坨，并不优雅.实际上执行器当然是复用的，不用每次都实现执行器.
 
 #### 3.async,await语法糖
-async,await终于出来,async与await是上述执行器，生成器模式的语法糖,运用async,await,再也不需要每次都定义生成器作为异步函数,然后显式传给执行器,只要简单在函数定义前增加async,如下:
+到了ES7,async,await终于出来.async与await是上述执行器，生成器模式的语法糖,运用async,await,再也不需要每次都定义生成器作为异步函数,然后显式传给执行器,只要简单在函数定义前增加async,表示这是一个异步函数,内部将用await来等待异步结果:
 ```JS
 async function foo() {
     let value = await 异步操作;
@@ -373,11 +379,11 @@ async表示该函数内部包含异步操作，需要把它交给内置执行器
 
 await表示等待异步操作的实际结果。
 
-至此，async/await的来龙去脉已基本描述完毕.
+至此，JS下async/await的来龙去脉已基本描述完毕.
 
 
 ### 回到iOS
-光描述JS生成器，迭代器，async,await就花了如此大篇幅，因为在iOS上将以它们的JS特性为目标，最终实现OC版的迭代器，生成器，async,await.
+光描述JS生成器，迭代器，async,await就花了大量篇幅，因为在iOS上将以它们的JS特性为目标，最终实现OC版的迭代器，生成器，async,await.
 
 #### 1.类型定义
 暂时无需在意怎么实现,既然是以前面描述的特性为目标，则可以根据其特性先做如下定义:
@@ -388,16 +394,16 @@ id yield(id value);
 ```
 yield接受一个对象value作为返回给迭代器的值，同时返回一个迭代器设置的新值或者原本值value.
 
-以及每次迭代的Result:
+每次迭代的Result:
 ```Objective-C
 @interface Result: NSObject
 @property (nonatomic, strong, readonly) id value;
 @property (nonatomic, readonly) BOOL done;
 @end
 ```
-value表示迭代的结果，为yield返回的对象，或者nil. done指示是否迭代结束.
+value表示迭代的结果，为yield返回的对象，或者nil.   done指示是否迭代结束.
 
-根据前面描述的生成器特性,那么在OC里，生成器首先应该是一个C函数/OC方法/block,且内部通过调用yield来返回Result对象给迭代器:
+根据前面描述的生成器特性,那么在OC里，生成器首先应该是一个C函数/OC方法/block,且内部通过调用yield来返回结果给迭代器:
 ```Objective-C
 void generator() {
     yield(value);
@@ -414,7 +420,16 @@ void generator() {
     yield(value);
 }
 ```
-实际上不论是OC方法，还是block,底层调用时都与调用C函数无异，所以只要实现了C函数版生成器，其实现机制将也无缝适用于OC方法，block.
+实际上不论是OC方法，还是block,底层调用时都与调用C函数无异.
+
+```objective-c
+只是调用block会默认以block结构体地址作为第一个隐含参数
+调用方法会以对象自身self，和选择器_cmd作为前两个隐含参数
+```
+
+所以只要实现了C函数版生成器，其实现机制将也无缝适用于OC方法，block.
+
+
 
 迭代器定义:
 ```Objective-C
@@ -447,11 +462,11 @@ Result *result = [iterator next: value];
 
 #### 2.实现生成器与迭代器
 
-根据需求，yield调用会中断当前执行流，并期望将来能够从中断处恢复继续执行,那么必定要在触发中断时保存现场，包括:
+根据需求,yield调用会中断当前执行流,并期望将来能够从中断处继续恢复执行,那么必定要在触发中断时保存现场，包括:
 
 (1)当前指令地址
 
-(2)当前寄存器信息，包括当前栈帧栈顶。
+(2)当前寄存器信息，包括当前栈帧栈顶
 
 ##### 而且 中断后到恢复的这段时间内，应当确保yield以及生成器generator的栈帧不会被销毁.
 
@@ -465,15 +480,15 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
 
 根据前面对生成器，迭代器的定义及需求推敲整理出如下的实现思路:
 
-(1) 迭代器通过next方法与生成器进行交互，在next方法内部会将控制流切换到生成器，生成器调用yield设置传给迭代器的返回值,并将执行流切换回next方法.
+(1) 迭代器通过next方法与生成器进行交互时，在next方法内部会将控制流切换到生成器，生成器通过调用yield设置传给迭代器的返回值,并将执行流切换回到next方法。
 
-(2) next方法拿到这个值，正常返回给调用者。
+(2) 切回next方法后,拿到这个值，正常返回给调用者。
 
 (3) 为了确保next方法返回后，生成器的执行栈不被销毁，因此生成器方法的执行需要在一个不被释放的新栈上进行。
 
-(4) 虽然next主要通过恢复现场方式切入生成器，但是首次还是需要调用方式来进入生成器，通过中介wrapper调用生成器的方式，可以检测到生成器执行结束的事件，然后wrapper切回 next 方法，并设置done为YES，迭代结束.
+(4) 虽然next主要通过恢复现场方式切入生成器，但是首次还是需要通过函数调用方式来进入生成器，通过中介wrapper调用生成器的方式，可以检测到生成器执行结束的事件，然后wrapper再切回 next 方法，并设置done为YES，迭代结束.
 
-整个流程如下:
+整个流程图解如下:
 
 ![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-26%20%E4%B8%8B%E5%8D%885.01.21.png)
 
@@ -484,7 +499,7 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
 
 
 
-因此为迭代器新增属性如下:
+根据此思路,为迭代器新增属性如下:
 ```Objective-C
 @interface Iterator : NSObject
 {
@@ -503,7 +518,7 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
 @end
 ```
 
-为生成器分配新栈,正如前面所述，在迭代器和生成器的生命周期中，next方法的每次迭代是要立即返回的，如果直接在next自己的调用栈上调用wrapper，wrapper再调用生成器，那么next返回后，生成器就算保护了寄存器现场，它的栈帧也被破坏了，再次恢复执行将产生无法预料的结果.
+为生成器分配新栈,正如前面所述，在迭代器和生成器的生命周期中，next方法的每次迭代是要正常返回的，如果直接在next自己的调用栈上调用wrapper，wrapper再调用生成器，那么next返回后，生成器就算保护了寄存器现场，它的栈帧也被破坏了，再次恢复执行将产生无法预料的结果.
 
 ```Objective-C
 //默认为生成器分配256K的执行栈
@@ -541,14 +556,15 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
     if (leave_value == 0) {
         //已经设置了生成器进入点
         if (_ev_entry_valid) {
-            //直接从生成器进入点进入
+            //设置传给生成器内yield的新值
             if (value) {
                 self.value = value;
             }
+            //直接从生成器进入点进入
             longjmp(_ev_entry, JMP_CONTINUE);
         }
         else {
-            //wrapper进入
+            //生成器还没保存过现场,从wrapper进入生成器
             
             //next栈会销毁,所以为wrapper启用新栈
             intptr_t sp = (intptr_t)(_stack + _stack_size);
@@ -556,7 +572,7 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
             sp -= 256;
             //对齐sp
             sp &= ~0x07;
-            //修改栈指针sp,指向新栈
+            //直接修改栈指针sp,指向新栈
 #if defined(__arm__)
             asm volatile("mov sp, %0" : : "r"(sp));
 #elif defined(__arm64__)
@@ -585,15 +601,15 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
 ```
 
 
-如果没有中介wrapper,那么迭代器返回将会造成崩溃，因为迭代器的运行栈和生成器是分开的，生成器内部执行return语句了，返回后的栈空间将是未定义的，很有可能造成非法内存访问而崩溃.中介wrapper很好地解决了这个问题:
+如果没有中介wrapper,那么迭代器返回将会造成崩溃，因为迭代器的运行栈和生成器是分开的，如果生成器内部执行return语句，返回后的栈空间将是未定义的，很有可能造成非法内存访问而崩溃.中介wrapper很好地解决了这个问题:
 
 ```Objective-C
 - (void)wrapper {
+   //调用生成器函数
     if (_func) {
         _func();
     }
     //从生成器返回，说明生成器完全执行结束
-    //直接返回到迭代器设置的返回点
     self.value = nil;
     //恢复next
     longjmp(_ev_leave, JMP_DONE);
@@ -602,21 +618,21 @@ setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函�
 }
 ```
 
-通过中介wrapper调用方式进入生成器，生成器最终返回后将正确返回到wrapper末尾继续执行，而wrapper也就知道，此时迭代应该结束了，因此以longjmp方式恢复next的现场，并设置恢复值为JMP_DONE,next被恢复后拿到这个值就知道生成器执行结束，迭代应该结束了.
+通过中介wrapper调用方式进入生成器，生成器最终返回后将正确返回到wrapper末尾继续执行，而wrapper也就知道，此时生成器结束了，因此以longjmp方式恢复next的现场，并设置恢复值为JMP_DONE,next被恢复后拿到这个值就知道生成器执行结束，迭代该结束了.
 
 
 
-yield的实现就更加简单，保存当前现场，将value值传递给迭代器对象，然后恢复迭代器next方法即可,而从next恢复yield的现场后，yield再取迭代器设置的新值返回给生成器内部:
+yield的实现就更加简单，保存当前现场，将value值传递给迭代器对象，然后恢复迭代器next方法即可,而当后续从next恢复yield的现场后，yield再取迭代器设置的新值返回给生成器内部，如此达到生成器与迭代器的数据交换:
 
 ```objective-c
 id yield(id value) {
-    //获取当前线程正在迭代的生成器
+    //获取当前线程正在获得的生成器
     Iterator *iterator = [IteratorStack top];
     return [iterator yield: value];
 }
 
 - (id)yield:(id)value {
-    //设置生成器的现场保护标志
+    //设置生成器的现场已保护标志
     _ev_entry_valid = YES;
     //现场保护
     if (setjmp(_ev_entry) == 0) {
@@ -636,7 +652,7 @@ id yield(id value) {
 
 
 
-至此已经实现了c函数版本的生成器，简单改变即可扩展到OC方法，block.首先是迭代器支持新的初始化方法:
+至此已经实现了c函数版本的生成器，简单改变即可扩展到OC方法，block.首先是迭代器需要支持新的初始化方法:
 
 ```objective-c
 @interface Iterator : NSObject
@@ -662,7 +678,7 @@ id yield(id value) {
 @end
 ```
 
-wrapper支持新的函数调用方式:
+wrapper支持新的生成器调用方式:
 
 ```objective-c
 - (void)wrapper {
@@ -676,7 +692,6 @@ wrapper支持新的函数调用方式:
         ((void (^)(void))_block)();
     }
     //从生成器返回，说明生成器完全执行结束
-    //直接返回到迭代器设置的返回点
     self.value = nil;
     //恢复next
     longjmp(_ev_leave, JMP_DONE);
@@ -689,7 +704,7 @@ wrapper支持新的函数调用方式:
 
 #### 3.通过生成器与迭代器改进异步编程
 
-正如前面描述的JS下的改进方法，现在可以用实现的生成器与迭代器来改进iOS的异步编程.
+正如前面描述的JS下的改进方法，现在可以用实现的生成器与迭代器来改进iOS的异步编程，且思路一模一样.
 
 首先定义异步操作为如下闭包:
 
@@ -698,7 +713,7 @@ typedef void (^AsyncCallback)(id  value, id  error);
 typedef void (^AsyncClosure)(AsyncCallback  callback);
 ```
 
-跟JS下的定义一样，这种闭包内部进行任何异步调用，最终以callback输出error和value即可.
+跟JS下的定义一样，这种闭包内部可进行任何异步调用，最终以callback输出error和value即可.
 
 同时PromiseKit提供的AnyPromise也可以作为异步操作.
 
@@ -729,243 +744,143 @@ iOS 版本readFile：
 执行器executor：
 
 ```objective-c
-
-```
-
-
-
-
-
-
-
-
-### 切换回iOS
-#### 1.美好的假设
-假设async/await/Promise已经在OC中支持，那么如上的读取文件列子即可这样实现:
-```Objective-C
-- (Promise *)readFileWithPath:(NSString *)path {
-    return [Promise promiseWithBlock: ^(void (^resolve)(id data), void (^reject)(id err)) {
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            NSData *data =  [NSData dataWithContentsOfFile:path];
-            if (data) {
-                //读取成功
-                resolve(data);
-            }
-            else {
-                //读取失败
-                reject([NSError new]);
-            }
-        });
-    }];
-}
-
-- (void async)read3Files {
-    @try {
-        NSData *data1 = await [self readFileWithPath:@".../path1"];
-        NSData *data2 = await [self readFileWithPath:@".../path2"];
-        NSData *data3 = await [self readFileWithPath:@".../path3"];
-        //全部读取完成
-    }
-    @catch(NSError *err) {
-        //读取出错
-    }
-}
-```
-但事实是OC并不支持，那么如果靠自己写第三方实现，支持如上异步编程方式呢?
-
-细想要完全如上是不可能的，用尽奇淫巧技也不可能以第三方库的形式让编译器支持如上新语法,因此稍微变换一下:
-```Objective-C
-- (void)read3Files {
-    async(^{
-        NSData *data1 = await( [self readFileWithPath:@".../path1"]);
-        NSData *data2 = await( [self readFileWithPath:@".../path2"]);
-        NSData *data3 = await( [self readFileWithPath:@".../path3"]);
-    })
-    .catch(^(error) {
-        //出错处理
-    })
-    .finally(^{
-        
-    })
-}
-```
-这样子就很有希望了, async/catch/fianlly链可以运用链式编程的思想实现，await只是一个普通c函数，async的参数也只是一个void (^)(void) 类型的block.因此基于完全可以实现的假设下，作如下约定:
-
-###### (1).把传给async的代码块叫做异步块，表示块内的代码将支持await.
-
-###### (2).await的含义仍然是等待异步操作的结果，等待成功后赋值给data。
-
-###### (3).在某个await等待异步操作完成的过程中，如果异步操作出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.
-
-###### (4).不管异步块成功执行结束，还是中间出错，finally块总会执行，方便进行一些收尾的操作.
-
-###### (5).Promise其实已经有很好的实现:PromiseKit. 但是还可以再抽象一下：什么是一个异步操作？
-
-可以理解为:"操作的完成不阻塞当前流程的操作" 便是异步操作。 因此完全可以如下定义一个闭包类型`AsyncClosure`为异步操作
-```Objective-C
-typedef void (^AsyncClosure)(void (^resultCallback)(id value, id error));
-```
-`AsyncClosure`的参数`resultCallback`作为输出操作结果的渠道，至于`AsyncClosure`内部，想要实现读取文件也好，下载数据也好，只要以非阻塞方式进行，最后通过`resultCallback`回调出结果即可. 
-
-也就是此情景下的Promise完全可以用`AsyncClosure`类型的闭包替代:
-```Objective-C
-- (AsyncClosure)readFileWithPath:(NSString *)path {
-    return  ^(void (^resultCallback)(id value, id error)) {
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            NSData *data =  [NSData dataWithContentsOfFile:path];
-            resultCallback(data, [NSError new]);
-        });
-    };
-}
-```
-
-#### 2.catch块引发的问题
-先不管如何实现，假设上面提到的都是可以实现的，那么细细推敲便发现新的问题：catch机制将引发内存泄露.
-
-正如上面对出错的约定：`在某个await等待异步操作完成的过程中，如果异步操作出错了，便在此await处终止代码块的执行流，并将执行流将转向catch块，统一处理错误.`，那么这时候的程序执行流便如下所示:
-
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%884.49.40.png)
-
-如上图所示,异步块首先分配了一个对象object,然后进行三个await操作，假设在第二个await的过程中，发生错误，那么程序执行流直接略过后面的所有代码，进入catch块处理错误。
-
-看起来很美，实际上这时不管在MRC，还是ARC下，object都无法得到释放。在ARC下，大部分情况下编译器为object生成的释放代码都处于代码块末端：
-
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%885.15.50.png)
-
-如果执行流从中间断开了，那么这些释放代码永远执行不到，将造成“每逢出错必泄露”的局面。
-
-#### 3.最终假设
-为避免上一步提到的内存泄露问题，决定放弃catch块统一处理错误的机制，根本目的是确保异步块执行流不会从中间“异常断开”。改进的方式是:
-
-(1)每次await将返回一个Result，Result包装了异步操作的实际结果值value,和错误对象error:
-```Objective-C
-@interface Result: NSObject
-@property (nonatomic, strong, readonly) id  value;
-@property (nonatomic, strong, readonly) id  error;
+@protocol LikePromise <NSObject>
+- (id<LikePromise> __nonnull (^ __nonnull)(id __nonnull))then;
+- (id<LikePromise>  __nonnull(^ __nonnull)(id __nonnull))catch;
 @end
+
+void executor(dispatch_block_t block) {
+    Iterator *  iterator = [[Iterator alloc] initWithBlock:block];
+    Result * __block result = nil;
+    
+    dispatch_block_t __block step;
+    step = ^{
+        if (!result.done) {
+            id value = result.value;
+            //oc闭包
+            if ([value isKindOfClass:NSClassFromString(@"__NSGlobalBlock__")] ||
+                [value isKindOfClass:NSClassFromString(@"__NSStackBlock__")] ||
+                [value isKindOfClass:NSClassFromString(@"__NSMallocBlock__")]
+                ) {
+                ((AsyncClosure)value)(^(id value, id error) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [result release];
+                        //将此次异步操作的结果包装成Result，传给生成器
+                        result = [iterator next: [Result resultWithValue:value error:error done:NO]].retain;
+                        step();
+                    });
+                });
+            }
+            //AnyPromise
+            else if (NSClassFromString(@"AnyPromise") &&
+                     [value isKindOfClass:NSClassFromString(@"AnyPromise")] &&
+                     [value respondsToSelector:@selector(then)] &&
+                     [value respondsToSelector:@selector(catch)]
+                     ) {
+                id <LikePromise> promise = (id <LikePromise>)value;
+                void (^__block then_block)(id) = NULL;
+                void (^__block catch_block)(id) = NULL;
+                
+                then_block = Block_copy(^(id value){
+                    if (then_block) { Block_release(then_block); then_block = NULL; }
+                    if (catch_block) { Block_release(catch_block); catch_block = NULL; }
+                    
+                    [result release];
+                    result = [iterator next: [Result resultWithValue:value error:nil done:NO]].retain;
+                    step();
+                });
+                
+                catch_block = Block_copy(^(id error){
+                    if (then_block) { Block_release(then_block); then_block = NULL; }
+                    if (catch_block) { Block_release(catch_block); catch_block = NULL; }
+                    
+                    [result release];
+                    result = [iterator next: [Result resultWithValue:nil error:error done:NO]].retain;
+                    step();
+                });
+                
+                promise.then(then_block).catch(catch_block);
+            }
+            //普通对象
+            else {
+                Result *old_result = result;
+                result = [iterator next: old_result].retain;
+                [old_result release];
+                
+                step();
+            }
+        }
+        else {
+            //执行过程结束
+            Block_release(step);
+            [result release];
+            [iterator release];
+        }
+    };
+    
+    step =  Block_copy(step);
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        result = iterator.next.retain;
+        step();
+    });
+}
 ```
-(2)每一步await的错误具体要怎么处理由程序员决定，不再统一处理:
-```Objective-C
-async(^{
-    Result *result1 = await( [self readFileWithPath:@".../path1"] );
-    if (result1.error) {
-      //第1步出错
-    }
+
+
+
+有了执行器executor,那么顺去读取文件的例子在iOS下可如下实现:
+
+```objective-c
+executor(^{
+    Result *result1 = yield( [self readFileWithPath:@".../path1"] );
+    if (result1.error) {/*第1步出错*/}
     NSData *data1 = result1.value;
     
-   Result *result2 = await( [self readFileWithPath:@".../path2"] );
-    if (result2.error) {
-      //第2步出错
-    }
+    Result *result2 = yield( [self readFileWithPath:@".../path2"] );
+    f (result1.error) {/*第2步出错*/}
     NSData *data2 = result2.value;
     
-    
-    Result *result3 = await( [self readFileWithPath:@".../path3"] );
-    if (result3.error) {
-      //第3步出错
-    }
+    Result *result3 = yield( [self readFileWithPath:@".../path3"] );
+    f (result1.error) {/*第3步出错*/}
     NSData *data3 = result3.value;
-})
-.finally(^{
-
-})
-```
-至此，整个假设已经没有什么逻辑上的硬伤，开始着手实现.
-
-### 实现
-```Objective-C
-async(^{
-    Result *result1 = await( [self readFileWithPath:@".../path1"] );
-    Result *result2 = await( [self readFileWithPath:@".../path2"] );
-    Result *result3 = await( [self readFileWithPath:@".../path3"] );
 });
 ```
-为满足async/await的定义. 异步块在执行的过程中要满足如下流程:
-
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%886.29.29.png)
 
 
-await在发起异步操作后，必须要暂停，如果不暂停，await将立刻返回，此时根本得不到异步操作结果。因此await以某种方式暂停，等待异步操作完成是必然.
 
-只是该如何暂停?
+#### 4.更好听的名字: async,await
 
-##### (1)用信号量机制，await在发起异步操作后，等待信号量。异步操作结束并回调后，再激活信号量，即线程挂起机制。
+将上一步实现的的执行器executor改名为async, 新增await函数:
 
-如果当前是子线程，貌似没问题。但是这和直接dispatch_async(global_queue, ^{}),并在子线程进行同步操作没有区别，这种方式实现出来的await完全是无用功，因为搞半天不如直接dispatch_async子线程。
+```objective-c
+RJResult * await(id value);
 
-如果当前是主线程，这种方式是灾难性的,主线程挂起了就基本告别APP了。
-
-因此线程挂起方式根本不可取。
-
-##### (2)协程机制
-协程的概念与原理资料颇多，总结来说，协程可以理解为可中断与恢复的函数。此处的中断与恢复并不是线程的挂起与恢复.假设当前函数A中断执行了，线程不会挂起，而是转而去执行函数B了，B函数也可能中断执行，然后又恢复执行函数A.就像cpu时间片轮转一样，一个线程“同时”执行着好几个函数，这种函数叫做“协程”。
-
-此处如果运用协程机制，那么await中断而不挂起线程，异步操作后在以某种机制恢复await的执行，正是想要的效果.
-
-
-#### 1.实现协程
-根据前面协程的描述，实现协程的目的在于实现这样一个函数：
-
-(1)函数执行过程中通过某种机制使函数中断执行。
-
-(2)有某种机制恢复被中止的函数从第一步中断处继续执行.
-
-
-为了实现这样的函数，需要清楚函数调用的基本原理.以arm32平台为例，在函执行过程中，需要在当前进程栈空间记录函数的执行信息，随着函数调用深度增加，栈空间向低地址扩展且最底端（栈顶）由寄存器sp记录。 每个函数有一片属于自己的记录区域，叫做栈桢，栈桢的起始地由桢指针寄存器fp记录，栈桢记录的主要信息包括：
-
-(1)当前函数的返回地址: 从当前函数返回到上一级函数后，继续执行何处的指令. 该地址在上一级调用当前函数时会自动存入LR寄存器。
-
-(2)当前函数保护的寄存器: 当前函数在执行过程中将会覆写大量寄存器，如果不保护, 返回到上一级函数后，数据就会混乱, 尤其需要保护上一级函数的桢指针fp.寄存器保护方式为将寄存器依次入栈，函数返回前又依次出栈.
-
-(3)当前函数的局部变量: 分配局部变量的方式为下移栈顶指针，即伸展栈，比如定义了一个16字节数组数组的局部变量:
-```
-char arr[16];
-```
-只需sp = sp - 16,即可完成arr的分配.
-
-(4)当前函数调用新函数所传的参数.在寄存器不够传参的情形下，剩余的参数将保存在栈空间，以供被调用函数访问。
-
-比如如下调用过程:
-```c
-void bar (arg, ...) {
-   //...
-}
-
-void foo(arg, ...) {
-   bar(arg, arg,...);
-   //...
-}
-
-int main() {
-    foo(arg, arg ...);
-    reutrn 0;
+RJResult * await(id value) {
+    return (Result *)yield(value);
 }
 ```
-在执行到main内部的时候，栈空间布局如下:
 
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%8810.25.40.png)
+其实await本质上就是yield.那么读取文件的例子就写成:
 
-执行到foo的时候,栈空间布局:
+```objective-c
+async(^{
+    Result *result1 = await( [self readFileWithPath:@".../path1"] );
+    if (result1.error) {/*第1步出错*/}
+    NSData *data1 = result1.value;
+    
+    Result *result2 = await( [self readFileWithPath:@".../path2"] );
+    f (result1.error) {/*第2步出错*/}
+    NSData *data2 = result2.value;
+    
+    Result *result3 = await( [self readFileWithPath:@".../path3"] );
+    f (result1.error) {/*第3步出错*/}
+    NSData *data3 = result3.value;
+});
+```
 
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%8810.36.20.png)
+至此便在iOS平台实现了async,await,且通过async,await可以化异步编程为同步风格.单靠短短字面描述无法面面俱到,比如setjmp,longjmp的原理及使用，函数调用过程与栈的联系,如有生疏要额外研究. 本文旨在描述在iOS平台上的一次对async,await的实现历程，可以通过下面的项目查看完整实现代码.
 
-执行到bar的时候，栈空间继续伸展:
+### 成果项目
 
-![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-25%20%E4%B8%8B%E5%8D%8810.36.30.png)
-
-反之，函数返回后，栈空间将向上收缩，收缩过程与如上的伸展过程完全相反.而当再次发生函数调用时，栈空间又会再次伸展,如此便是函数调用的基本过程，栈空间可以认为是函数活动记录的重要数据区.
-
-##### 函数的中断与恢复
-假设想要中断函数bar,那么必须记录足够的信息，将来才能恢复执行:
-
-(1)此刻正执行的指令地址.
-
-(2)此刻的寄存器环境.其中便包含了跟栈桢有关的寄存器fp,sp.
-
-还有要想在将来恢复执行bar，就要保证中断后bar的栈桢不会被破坏,比如虽然保存了bar此刻的指令与寄存器信息，但是接着bar却返回了，或者bar的上一级foo返回了，那么整个栈会立刻收缩,bar的栈桢不复存在.
-
-何时触发中断?
-
-
-##### 切换回iO
-##### 切换回iOS
+[**RJIterator**](https://github.com/renjinkui2719/RJIterator)是我根据本文描述的思路实现的迭代器,生成器，yield,async,await的完整项目，欢迎交流与探讨.
