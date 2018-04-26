@@ -377,10 +377,10 @@ await表示等待异步操作的实际结果。
 
 
 ### 回到iOS
-光描述JS生成器，迭代器，async,await就花了如此大篇幅，不为别的，就因为在iOS上将以它们的JS特性为目标，最终实现OC版的迭代器，生成器，async,await，虽然是OC版.
+光描述JS生成器，迭代器，async,await就花了如此大篇幅，因为在iOS上将以它们的JS特性为目标，最终实现OC版的迭代器，生成器，async,await.
 
-#### 1.实现生成器与迭代器
-暂时不要在意怎么实现的细节,既然是以前面描述的特性为目标，则可以根据其特性先做如下定义:
+#### 1.类型定义
+暂时无需在意怎么实现,既然是以前面描述的特性为目标，则可以根据其特性先做如下定义:
 
 先定义yield如下:
 ```Objective-C
@@ -440,12 +440,205 @@ void generator() {
 Iterator *iterator = [[Iterator alloc] initWithFunc: generator];
 ```
 然后就可以像JS一样调用next来进行迭代:
-```
+```Objective-C
 Result *result = iterator.next;
 //迭代并传值
 Result *result = [iterator next: value];
 ```
 
+#### 2.实现生成器与迭代器
+
+根据需求，yield调用会中断当前执行流，并期望将来能够从中断处恢复继续执行,那么必定要在触发中断时保存现场，包括:
+
+(1)当前指令地址
+
+(2)当前寄存器信息，包括当前栈帧栈顶。
+
+而且 中断后到恢复的这段时间内，应当确保yield以及生成器generator的栈帧不会被销毁.
+
+而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,恢复跳转到保存的指令地址处继续执行.
+
+上述过程描述起来看似简单，但是如果要自己写汇编代码去保存与恢复现场，并适配各种平台，要保证稳定性还是很难的，好在有C标准库提供的现成利器:setjmp/longjmp。
+
+setjmp/longjmp可以实现跨函数的远程跳转，对比goto只能实现函数内跳转，setjmp/longjmp实现远程跳转给予的就是保存现场与恢复现场,非常符合此处的需求.
+
+#### 迭代器实现
+迭代器是与生成器直接交互的对象,交互方式是通过next方法，那么在next方法内部必定以某种机制将流程“切入”到生成器，而生成器通过yield将返回值交给迭代器，并将执行流切换回next方法，next方法拿到这个值，正常返回给调用者.因此为迭代器新增属性如下:
+```Objective-C
+@interface Iterator : NSObject
+{
+    int *_ev_leave; //迭代器在next方法内保存的现场
+    int *_ev_entry; //生成器通过yield保存的现场
+    BOOL _ev_entry_valid; //指示生成器现场是否可用
+    void *_stack; //为生成器新分配的栈
+    int _stack_size; //为生成器新分配的栈大小
+    void (*_func)(void);
+    BOOL _done; //是否迭代结束
+    id _value; //生成器传给的值
+}
+```
+
+为生成器分配新栈,因为next方法是要返回的，如果直接在next自己的调用栈上调用生成器，那么next返回后，生成器就算保护了寄存器现场，它的栈帧也被破坏了，再次恢复执行将产生无法预料的结果.
+
+```Objective-C
+//默认为生成器分配256K的执行栈
+#define DEFAULT_STACK_SIZE (256 * 1024)
+
+- (id)init {
+    if (self = [super init]) {
+        _stack = malloc(DEFAULT_STACK_SIZE);
+        memset(_stack, 0x00, DEFAULT_STACK_SIZE);
+        _stack_size = DEFAULT_STACK_SIZE;
+        
+        _ev_leave = malloc(sizeof(jmp_buf));
+        memset(_ev_leave, 0x00, sizeof(jmp_buf));
+        _ev_entry = malloc(sizeof(jmp_buf));
+        memset(_ev_entry, 0x00, sizeof(jmp_buf));
+    }
+    return self;
+}
+```
+
+next方法:
+```Objective-C
+#define JMP_CONTINUE 1
+#define JMP_DONE 2
+
+- (Result *)next:(id)value {
+    if (_done) {
+       //迭代器已结束
+       return [Result resultWithValue:_value error:_error done:_done];
+    }    
+    //保存next执行环境
+    int leave_value = setjmp(_ev_leave);
+    //非跳转返回
+    if (leave_value == 0) {
+        //已经设置了生成器进入点
+        if (_ev_entry_valid) {
+            //直接从生成器进入点进入
+            if (value) {
+                self.value = value;
+            }
+            longjmp(_ev_entry, JMP_CONTINUE);
+        }
+        else {
+            //wrapper进入
+            
+            //next栈会销毁,所以为wrapper启用新栈
+            intptr_t sp = (intptr_t)(_stack + _stack_size);
+            //预留安全空间，防止直接move [sp] 传参 以及msgsend向上访问堆栈
+            sp -= 256;
+            //对齐sp
+            sp &= ~0x07;
+            
+#if defined(__arm__)
+            asm volatile("mov sp, %0" : : "r"(sp));
+#elif defined(__arm64__)
+            asm volatile("mov sp, %0" : : "r"(sp));
+#elif defined(__i386__)
+            asm volatile("movl %0, %%esp" : : "r"(sp));
+#elif defined(__x86_64__)
+            asm volatile("movq %0, %%rsp" : : "r"(sp));
+#endif
+            //在新栈上调用wrapper,至此可以认为wrapper,以及生成器函数的运行栈和next无关
+            [self wrapper];
+        }
+    }
+    //生成器内部跳转返回
+    else if (leave_value == JMP_CONTINUE) {
+        //还可以继续迭代
+    }
+    //生成器wrapper跳转返回
+    else if (leave_value == JMP_DONE) {
+        //生成器结束，迭代完成
+        _done = YES;
+    }
+        
+    return [RJResult resultWithValue:_value error:_error done:_done];
+}
+```
+调用迭代器方法next时,先保存next
+
+为保证生成器执行完后,
+```Objective-C
+- (void)wrapper {
+    if (_func) {
+        _func();
+    }
+    //从生成器返回，说明生成器完全执行结束
+    //直接返回到迭代器设置的返回点
+    self.value = nil;
+    
+    longjmp(_ev_leave, JMP_DONE);
+    //不会到此
+    assert(0);
+}
+```
+
+
+是
+
+
+
+
+而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,恢复跳转到保存的指令地址处继续执行.guo
+而恢复执行的过程是保存现场的逆过程，即恢复相关寄存器,恢复跳转到保存的指令地址处继续执行.
+
+setjmp和longjmp
+
+对于如下生成器:
+```C
+void generator() {
+    yield(value);
+    yield(value);
+}
+```
+在执行进入yield后，调用栈布局应该如下:
+
+![](http://oem96wx6v.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202018-04-26%20%E4%B8%8B%E5%8D%882.32.39.png)
+
+
+
+
+
+
+假设函数foo定义如下:
+```Objective-C
+void foo() {
+    int a = 0x10;
+    int b = 0x20;
+    int r = a + b;
+    printf("a + b = %d", r);
+}
+```
+对应的ARM32位汇编:
+```asm
+foo:
+    0x82448 <+0>:  push   {r7, lr}
+    0x8244a <+2>:  mov    r7, sp
+    0x8244c <+4>:  sub    sp, #0x10
+    0x8244e <+6>:  movw   r0, #0x37bf
+    0x82452 <+10>: movt   r0, #0x0
+    0x82456 <+14>: add    r0, pc;   ;定位常量字符串: "a + b = %d"
+    0x82458 <+16>: movs   r1, #0x20 
+    0x8245a <+18>: movs   r2, #0x10 
+    0x8245c <+20>: str    r2, [sp, #0xc] ;a = 0x10
+    0x8245e <+22>: str    r1, [sp, #0x8] ;b = 0x10
+    0x82460 <+24>: ldr    r1, [sp, #0xc]
+    0x82462 <+26>: ldr    r2, [sp, #0x8]
+    0x82464 <+28>: add    r1, r2  ;r = a + b
+    0x82466 <+30>: str    r1, [sp, #0x4]
+    0x82468 <+32>: ldr    r1, [sp, #0x4]
+    0x8246a <+34>: blx    0x84400    ;调用printf
+    0x8246e <+38>: str    r0, [sp]
+    0x82470 <+40>: add    sp, #0x10
+    0x82472 <+42>: pop    {r7, pc}
+
+```
+假设执行指令
+```
+0x82458 <+16>: movs   r1, #0x20 
+```
 
 
 
