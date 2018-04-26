@@ -1,8 +1,87 @@
 
 #### 在iOS平台实现新的异步解决方案async/await
 async,await是ES7提出的异步解决方案，对比回调链和Promise.then链的异步编程模式，基于async,await可以同步风格编写异步代码，程序逻辑清晰明了.
+如顺序读取三个文件:
+```JS
+function readFile(name) {
+  return new Promise((resolve, reject) => {
+    //异步读取文件
+    fs.readFile(name, (err, data) => {
+        if (err) reject(err);
+        else resolve(data);
+    });
+  });
+}
 
-接触完毕后，深感如果在iOS项目中也能像JS这般编写异步代码真是极好。经过研究发现要在iOS平台实现这些特性其实并不是很困难，因此本文主旨便是描述async,await在iOS平台的实现过程，并给出了一个成果项目.
+async function read3Files() {
+  try {
+      //读取第1个文件
+      let data1 = await readFile('file1.txt');
+      //读取第2个文件
+      let data2 = await readFile('file2.txt');
+      //读取第3个文件
+      let data3 = await readFile('file3x.txt');
+      //3个文件读取完毕
+    } catch (error) {
+       //读取出错
+    }
+}
+```
+读取文件本身是异步操作，而在要求顺序读取的前提下，基于callback实现将造成很深的回调嵌套:
+```JS
+
+function readFile(name, callback) {
+  //异步读取文件
+  fs.readFile(name, (err, data) => {
+     callback(err, data);
+  });
+}
+
+function read3Files() {
+  //读取第1个文件
+  readFile('file1.txt', (err, data) => {
+    //读取第2个文件
+    readFile('file2.txt', (err, data) => {
+      //读取第3个文件
+      readFile('file3.txt', (err, data) => {
+        //3个文件读取完毕
+      });
+    });
+  });
+}
+```
+基于Promise.then链需要将逻辑分散在过多的代码块:
+```JS
+function readFile(name) {
+  return new Promise((resolve, reject) => {
+    //异步读取文件
+    fs.readFile(name, (err, data) => {
+       if (err) reject(err);
+       else resolve(data);
+    });
+  });
+}
+
+function read3Files() {
+  //读取第1个文件
+  readFile('file1.txt')
+  .then(data => {
+    //读取第2个文件
+    return readFile('file2.txt');
+  })
+  .then(data => {
+    //读取第3个文件
+    return readFile('file3.txt');
+  })
+  .then(data => {
+    //3个文件读取完毕
+  })
+  .catch(error => {
+    //读取出错
+  });
+}
+```
+对比足见aync/await模式的优雅与简洁,接触完毕后，深感如果在iOS项目中也能像JS这般编写异步代码真是极好。经过研究发现要在iOS平台实现这些特性其实并不是很困难，因此本文主旨便是描述async,await在iOS平台的实现过程，并给出了一个成果项目.
 
 ### 切换到JavaScript
 
