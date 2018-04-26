@@ -65,6 +65,40 @@ console.log(result);
 
 到此迭代结束，此后通过此迭代器的next方法，都将得到相同的结果`{ value: undefined, done: true }`
 
+(4)通过迭代器向生成器内部传值
+```JS
+function *hello() {
+  let age =  yield 'want age';
+  let name = yield 'want name';
+  console.log(`Hello, my age: ${age}, name:${name}`);
+}
+
+let iterator = hello();
+```
+创建迭代器并开始如下迭代过程:
+
+(1)第1次迭代,生成器开始执行，到达第一个yield语句时，返回`value = want age, done = false`给迭代器, 并中断。
+```JS
+let result = iterator.next();
+console.log(result);
+//输出 => { value: 'want age', done: false }
+```
+(2)第2次迭代,给next传参28, 生成器从上次中断的地方恢复执行，并将28作为苏醒后yield的内部返回值赋给age; 然后生成器继续执行，再次遇到yield，返回`value = want name, done = false`给迭代器, 并中断。
+```JS
+result = iterator.next(28);
+console.log(result);
+//输出 => { value: 'want name', done: false }
+```
+(3)第3次迭代,给next传参'LiLei', 生成器从上次中断的地方恢复执行，并将'LiLei'作为苏醒后yield的内部返回值赋给name; 然后生成器继续执行，打印log:
+```
+Hello, my age: 28, name:LiLei
+```
+然后彻底结束生成器，返回`value = undefined, done = true`给迭代器。
+```JS
+result = iterator.next('LiLei');
+console.log(result);
+//输出 => { value: undefined, done: true }
+```
 
 第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
 
