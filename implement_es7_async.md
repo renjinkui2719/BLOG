@@ -172,12 +172,21 @@ console.log(result);
 ```
 Hello, my age: 28, name:LiLei
 ```
-然后彻底结束生成器，返回`value = undefined, done = true`给迭代器。
+然后到达函数尾，彻底结束生成器，返回`value = undefined, done = true`给迭代器。
 ```JS
 result = iterator.next('LiLei');
 console.log(result);
 //输出 => { value: undefined, done: true }
 ```
+
+至此已基本了解了生成器与迭代器的语法与运用,总结起来:
+
+ ##### 生成器是一个函数，直接调用得到其对应的迭代器，用以控制生成器的逐步执行;
+ ##### 生成器内部通过yield语法向迭代器返回值，而且可以多次返回,并多次恢复执行，有别于传统函数"返回便消亡"的特点;
+ ##### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器苏醒后的右值.
+ 
+
+
 
 第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
 
