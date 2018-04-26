@@ -314,24 +314,11 @@ function executor(generator) {
   let nextStep = function() {
     //迭代还没结束
     if (!result.done) {
-      //从生成器拿到的是一个闭包异步操作
       if (typeof result.value === "function") {
-        //发起异步操作
-        result.value((err, data) => {
-          if(err) {
-            //在生成器内部引发异常
-            iterator.throw(err);
-          }
-          else {
-            //得到结果值,传给生成器
-            result = iterator.next(data);
-            //继续下一步迭代
-            nextStep();
-          }
-        });
+        ....
       }
       //从生成器拿到的是一个Promise异步操作
-      if (result.value instanceof Promise) {
+      else if (result.value instanceof Promise) {
         //执行该Promise
         result.value.then(data => {
           //得到结果值,传给生成器
@@ -343,19 +330,50 @@ function executor(generator) {
           iterator.throw(err);
         });
       }
-      //从生成器拿到的是一个普通对象
       else {
-        //什么都不做，直接传回给生成器
-        result = iterator.next(result.value);
-        //继续下一步迭代
-        nextStep();
+        ...
       }
     }
   };
-  //开始后续迭代
-  nextStep();
+  ...
 }
 ```
+
+到此已经成功把异步编程化为同步风格，或许看起来有疑问:这个例子是化为同步风格了，但是那个执行器executor实现看起来好大一坨，并不优雅.实际上执行器当然是复用的，不用每次都实现执行器.
+
+#### 3.async,await语法糖
+async,await终于出来,async与await是上述执行器，生成器模式的语法糖,运用async,await,再也不需要每次都定义生成器作为异步函数,然后传给执行器,只要简单在函数定义前增加async,如下:
+```JS
+async function foo() {
+    let value = await 异步操作;
+    let value = await 异步操作;
+    let value = await 异步操作;
+    let value = await 异步操作;
+}
+```
+如读取文件例子:
+```JS
+async function read3Files() {
+    //读取第1个文件
+    let data1 = await readFile('file1.txt');
+    //读取第2个文件
+    let data2 = await readFile('file2.txt');
+    //读取第3个文件
+    let data3 = await readFile('file3x.txt');
+    //3个文件读取完毕
+}
+```
+然后直接调用即可:
+```
+read3Files();
+```
+async表示该函数内部包含异步操作，需要把她交给执行器;await表示等待异步操作的实际结果。
+
+至此，async/await的来龙去脉已基本描述完毕.
+
+
+
+
 
 第3次调用next,生成器numbers从上次中断的位置恢复执行,继续执行到下一个yield语句时，numbers再次中断，并将结果值`3`返回给迭代器，由于numbers并没有执行完，所以done为false.
 
