@@ -112,6 +112,12 @@ let result = iterator.next();
 每一次next调用将得到结果result, result对象包含两个属性:`value`和`done`.value表示此次迭代得到结果值,done表示是否迭代结束.
 比如此例:
 ```JS
+function *numbers() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+
 let iterator = numbers();
 //第1次迭代
 let result = iterator.next();
