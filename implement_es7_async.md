@@ -85,16 +85,16 @@ function read3Files() {
 
 ### 暂时继续讨论JavaScript
 
-#### 迭代器与生成器
+#### 生成器与迭代器
 要明白async/await的机制及运用,需从生成器与迭代器逐步说起.在ES6中，生成器是一个函数，和普通函数的区别是:
 
-(1)生成器函数function关键字后多了个*:
+##### (1)生成器函数function关键字后多了个*:
 ```JS
 function *numbers() {
 }
 ```
 
-(2)生成器函数内可以yield语法多次返回值:
+##### (2)生成器函数内可以yield语法多次返回值:
 ```JS
 function *numbers() {
     yield 1;
@@ -103,7 +103,7 @@ function *numbers() {
 }
 ```
 
-(3)直接调用生成器函数得到的是一个迭代器，通过迭代器的next方法控制生成器的执行:
+##### (3)直接调用生成器函数得到的是一个迭代器，通过迭代器的next方法控制生成器的执行:
 ```JS
 let iterator = numbers();
 
@@ -150,7 +150,7 @@ console.log(result);
 
 到此迭代结束，此后通过此迭代器的next方法，都将得到相同的结果`{ value: undefined, done: true }`
 
-(4)通过迭代器向生成器内部传值
+##### (4)通过迭代器可向生成器内部传值
 ```JS
 function *hello() {
   let age =  yield 'want age';
@@ -162,35 +162,61 @@ let iterator = hello();
 ```
 创建迭代器并开始如下迭代过程:
 
-(1)第1次迭代,生成器开始执行，到达第一个yield语句时，返回`value = want age, done = false`给迭代器, 并中断。
+第1次迭代,生成器开始执行，到达第一个yield语句时，返回`value = want age, done = false`给迭代器, 并中断。
 ```JS
 let result = iterator.next();
 console.log(result);
 //输出 => { value: 'want age', done: false }
 ```
-(2)第2次迭代,给next传参28, 生成器从上次中断的地方恢复执行，并将28作为苏醒后yield的内部返回值赋给age; 然后生成器继续执行，再次遇到yield，返回`value = want name, done = false`给迭代器, 并中断。
+第2次迭代,给next传参28, 生成器从上次中断的地方恢复执行，并将28作为苏醒后yield的内部返回值赋给age; 然后生成器继续执行，再次遇到yield，返回`value = want name, done = false`给迭代器, 并中断。
 ```JS
 result = iterator.next(28);
 console.log(result);
 //输出 => { value: 'want name', done: false }
 ```
-(3)第3次迭代,给next传参'LiLei', 生成器从上次中断的地方恢复执行，并将'LiLei'作为苏醒后yield的内部返回值赋给name; 然后生成器继续执行，打印log:
+第3次迭代,给next传参'LiLei', 生成器从上次中断的地方恢复执行，并将'LiLei'作为苏醒后yield的内部返回值赋给name; 然后生成器继续执行，打印log:
 ```
 Hello, my age: 28, name:LiLei
 ```
-然后到达函数尾，彻底结束生成器，返回`value = undefined, done = true`给迭代器。
+然后到达函数尾，彻底结束生成器，并返回`value = undefined, done = true`给迭代器。
 ```JS
 result = iterator.next('LiLei');
 console.log(result);
 //输出 => { value: undefined, done: true }
 ```
 
+可见通过迭代器可以与生成器“互相交换数据”，生成器通过yield返回数据A给迭代器，而通过迭代器可以把数据B传给生成器，让此yied语句苏醒后以B作为右值. 
+
 至此已基本了解了生成器与迭代器的语法与运用,总结起来:
 
- ##### 生成器是一个函数，直接调用得到其对应的迭代器，用以控制生成器的逐步执行;
- ##### 生成器内部通过yield语法向迭代器返回值，而且可以多次返回,并多次恢复执行，有别于传统函数"返回便消亡"的特点;
- ##### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器苏醒后的右值.
+ ###### 生成器是一个函数，直接调用得到其对应的迭代器，用以控制生成器的逐步执行;
+ ###### 生成器内部通过yield语法向迭代器返回值，而且可以多次返回,并多次恢复执行，有别于传统函数"返回便消亡"的特点;
+ ###### 可以通过迭代器向生成器内部传值，传入的值将作为本次生成器苏醒后的右值.
  
+ 
+#### 通过生成器与迭代器改进异步编程
+回想本文开头提到的读取文件例子,如果以callback模式编写:
+```JS
+function readFile(name, callback) {
+  //异步读取文件
+  fs.readFile(name, (err, data) => {
+     callback(err, data);
+  });
+}
+
+function read3Files() {
+  //读取第1个文件
+  readFile('file1.txt', (err, data) => {
+    //读取第2个文件
+    readFile('file2.txt', (err, data) => {
+      //读取第3个文件
+      readFile('file3.txt', (err, data) => {
+        //3个文件读取完毕
+      });
+    });
+  });
+}
+```
 
 
 
