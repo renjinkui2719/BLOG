@@ -37,7 +37,7 @@
 
 App与服务器基于Http协议通信，通用请求格式:
 
-```JSON
+```
 Method:  POST
 
 Body: JSONString({
@@ -49,12 +49,11 @@ Body: JSONString({
    ...
   }
 })
-
 ```
 
 通用应答格式:
 
-```json
+```
 Body: JSONString({
   errcode: 0,
   clientId: "xxxx",
@@ -66,7 +65,7 @@ Body: JSONString({
 
 errcode指示此次请求的成功与否，0表示请求成功，非0表示失败:
 
-```json
+```
 1000 请求格式错误
 1001 URL错误
 1002 App账户不存在
@@ -87,7 +86,7 @@ format为“JSON”表示payload是明文的JSON字符串，App根据具体的�
 
 Req => 
 
-```json
+```
 Method:  POST
 URL: "http://SERVER_IP:SERVER_PORT/pullOnlineTerminals"
 
@@ -124,7 +123,7 @@ Body: JSONString({
 
 Req => 
 
-```json
+```
 Method:  POST
 URL: "http://SERVER_IP:SERVER_PORT/pushText"
 
@@ -139,7 +138,7 @@ Body: JSONString({
 
 Res <=
 
-```json
+```
 Body: JSONString({
   errcode: 0,
   clientId: "xxxx",
