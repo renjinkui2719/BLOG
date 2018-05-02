@@ -101,7 +101,7 @@ Body: JSONString({
 
 Res <=
 
-```json
+```
 Body: JSONString({
   errcode: 0,
   clientId: "xxxx",
