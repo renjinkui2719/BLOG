@@ -35,7 +35,7 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 最�
 
 更多细节可以看这两行代码对应的汇编:
 
-![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_cf_to_oc.tiff)
+![](http://oem96wx6v.bkt.clouddn.com/__bridge_cf_to_oc.tiff)
 
 
 
@@ -54,7 +54,7 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 不�
 
 更多细节可以看这两行代码对应的汇编:
 
-![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_oc_to_cf.tiff)
+![](http://oem96wx6v.bkt.clouddn.com/__bridge_oc_to_cf.tiff)
 
 
 
@@ -79,7 +79,7 @@ NSString *ocString = (__bridge_transfer NSString *)cfString;
 
 感兴趣可以细看这两句代码对应汇编:
 
-![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_transfer.tiff) 
+![](http://oem96wx6v.bkt.clouddn.com/__bridge_transfer.tiff) 
 
 ##### 使用__bridge_transfer有2个重要原则：
 
@@ -96,7 +96,7 @@ NSString *value = (__bridge_transfer NSString *)CFArrayGetValueAtIndex(cfArray, 
 
 根据CoreFundation内存管理的三原则：
 
-![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/cf_mem_policy.tiff)
+![](http://oem96wx6v.bkt.clouddn.com/cf_mem_policy.tiff)
 
 通过Create/Copy方法得到的对象我们是有所有权的，但是通过Get得到的，是没有所有权的.
 
@@ -128,9 +128,9 @@ CFRelease(cfSuffix);
 
 #### 3.\_\_bridge_retained
 
-\_\_bridge_retained 等价于 CFBridgingRetain (),用以将OC对象转换为CF对象，并且Retain Count + 1.
+**\_\_bridge_retained 等价于 CFBridgingRetain (),用以将OC对象转换为CF对象，并且Retain Count + 1.**
 
-注意和__bridge_transfer转移所有权的差别，\_\_bridge_retained不存在转移什么所有权，而是简单粗暴的Retain Count + 1：编译器看到\_\_bridge_retained指示符，会生成一条对OC对象的retain语句并在赋值前调用它.因此在不需要该CF对象的时候,必须手动调用CFRelease对其进行Retain Count -1。 
+**注意和__bridge_transfer转移所有权的差别，\_\_bridge_retained不存在转移什么所有权，而是简单粗暴的Retain Count + 1：编译器看到\_\_bridge_retained指示符，会生成一条对OC对象的retain语句并在赋值前调用它.因此在不需要该CF对象的时候,必须手动调用CFRelease对其进行Retain Count -1。 **
 
  两行代码的简单例子: 
 
@@ -143,7 +143,7 @@ CFStringRef cfString = (__bridge_retained CFStringRef)ocString;
 
 感兴趣可以细看这两句代码对应汇编:
 
-![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_retained.tiff)
+![](http://oem96wx6v.bkt.clouddn.com/__bridge_retained.tiff)
 
 
 
