@@ -18,7 +18,7 @@ CF手动管理: 对象生命周通过手动调用CFRetain/CFRelease来管理期.
 
 #### 1.__bridge 
 
-**用以将 CF对象转换为OC对象，或者OC对象转换为CF对象,但是不会对对象的Retain Count,所有权 产生任何影响。**
+##### 用以将 CF对象转换为OC对象，或者OC对象转换为CF对象,但是不会对对象的Retain Count,所有权 产生任何影响。
 
 (1)CF对象转换为OC对象
 
@@ -62,7 +62,7 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 不�
 
 #### 2.\_\_bridge_transfer
 
-**\_\_bridge_transfer 等价于 CFBridgingRelease(),  将CF对象转换为OC对象,并将所有权转移给ARC.  所有权转移给ARC的本质含义就是：最终CF对象会被ARC生成的代码进行Retain Count -1操作或者释放，不需要手动调用CFRelease **
+##### \_\_bridge_transfer 等价于 CFBridgingRelease(),  将CF对象转换为OC对象,并将所有权转移给ARC.  所有权转移给ARC的本质含义就是：最终CF对象会被ARC生成的代码进行Retain Count -1操作或者释放，所以不需要手动调用CFRelease
 
 CFBridgingRelease中的Release不是真的会进行Release操作，而应该理解为释放所有权:本来属于CF的，现在放权给ARC，CF不管了,我猜测这也就是为什么CFBridgingRelease的对应语法关键字不叫\_\_bridge_release,而叫\_\_bridge_transfer的原因，即transfer所有权.
 
@@ -128,9 +128,9 @@ CFRelease(cfSuffix);
 
 #### 3.\_\_bridge_retained
 
-**\_\_bridge_retained 等价于 CFBridgingRetain (),用以将OC对象转换为CF对象，并且Retain Count + 1.**
+##### \_\_bridge_retained 等价于 CFBridgingRetain (),用以将OC对象转换为CF对象，并且Retain Count + 1.
 
-**注意和__bridge_transfer转移所有权的差别，\_\_bridge_retained不存在转移什么所有权，而是简单粗暴的Retain Count + 1：编译器看到\_\_bridge_retained指示符，会生成一条对OC对象的retain语句并在赋值前调用它.因此在不需要该CF对象的时候,必须手动调用CFRelease对其进行Retain Count -1。 **
+##### 注意和__bridge_transfer转移所有权的差别，\_\_bridge_retained不存在转移什么所有权，而应当是赋予所有权, 方式就是简单粗暴的将Retain Count + 1：编译器看到\_\_bridge_retained指示符，会生成一条对OC对象的retain语句并在赋值前调用它.因此在不需要该CF对象的时候,必须手动调用CFRelease对其进行Retain Count -1。 
 
  两行代码的简单例子: 
 
