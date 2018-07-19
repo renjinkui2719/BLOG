@@ -35,6 +35,8 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 最�
 
 更多细节可以看这两行代码对应的汇编:
 
+![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_cf_to_oc.tiff)
+
 
 
 (2)OC对象转CF对象
@@ -51,6 +53,10 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 不�
 而且这个赋值并不会改变ocString的Retain Count，和前面（1）的情况的差别就是，这里cfString不属于ARC管理的范畴，ARC不会为它生成管理代码.
 
 更多细节可以看这两行代码对应的汇编:
+
+![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_oc_to_cf.tiff)
+
+
 
 
 
@@ -73,9 +79,9 @@ NSString *ocString = (__bridge_transfer NSString *)cfString;
 
 感兴趣可以细看这两句代码对应汇编:
 
- 
+![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_transfer.tiff) 
 
-使用__bridge_transfer有2个重要原则：
+##### 使用__bridge_transfer有2个重要原则：
 
 （1）不属于自己的CF对象不要随便给ARC，否则会造成尝试释放已释放的对象而崩溃。
 
@@ -90,7 +96,7 @@ NSString *value = (__bridge_transfer NSString *)CFArrayGetValueAtIndex(cfArray, 
 
 根据CoreFundation内存管理的三原则：
 
-![Pasted Graphic 6.tiff](/var/folders/zp/rksq0gtj1qq4jx__n4kq2zvc0000gq/T/abnerworks.Typora/F522D943-05A8-439E-AE9A-01F72FB4F99C/Pasted%20Graphic%206.tiff)
+![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/cf_mem_policy.tiff)
 
 我们通过Create/Copy方法得到的对象我们是有所有权的，但是通过Get得到的，是没有所有权的.
 
@@ -135,6 +141,12 @@ CFStringRef cfString = (__bridge_retained CFStringRef)ocString;
 
 本例中，不需要cfString的时候，必须要CFRelease(cfString),否则cfString得不到释放，内存泄漏.
 
+感兴趣可以细看这两句代码对应汇编:
+
+![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/__bridge_retained.tiff)
 
 
-总结：三句话可以说清楚的事情写如此一大堆，期望能对更加清楚的认识：\_\_bridge,\_\_bridge_transfer,\_\_bridge_retaine有所帮助.
+
+#### 总结
+
+三句话可以说清楚的事情写如此一大堆，只期望能对更加清楚的认识：\_\_bridge,\_\_bridge_transfer,\_\_bridge_retaine有所帮助.
