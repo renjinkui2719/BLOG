@@ -69,7 +69,7 @@ CFBridgingRelease中的Release不是真的会进行Release操作，而应该理�
 两行代码的简单例子: 
 
 ```objective-c
-StringRef cfString = CFStringCreateMutable(kCFAllocatorDefault, 10);
+CFStringRef cfString = CFStringCreateMutable(kCFAllocatorDefault, 10);
 NSString *ocString = (__bridge_transfer NSString *)cfString;
 ```
 
