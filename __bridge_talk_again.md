@@ -14,7 +14,7 @@ OC对象:  就是OC对象.
 
 ARC管理: 对象生命周期的retain与release操作由编译器生成的代码进行管理，不需要手动管理.
 
-CF手动管理: 对象生命周通过手动调用CFRetain/CFRelease来管理期.
+CF手动管理: 对象生命周通过手动调用CFRetain/CFRelease来管理.
 
 #### 1.__bridge 
 
