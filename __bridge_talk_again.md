@@ -12,15 +12,15 @@ OC对象:  就是OC对象.
 
 所有权:  管理对象生命周期的权利, 准确说其实是: 将对象进行Retain Count -1的权利和义务.
 
-ARC管理: 即对象生命周期的retain与release操作由编译器ARC机制生成的代码进行管理，不需要手动管理.
+ARC管理: 对象生命周期的retain与release操作由编译器生成的代码进行管理，不需要手动管理.
 
-CF手动管理: 必须手动调用CFRetain/CFRelease来管理对象生命周期.
+CF手动管理: 对象生命周通过手动调用CFRetain/CFRelease来管理期.
 
 #### 1.__bridge 
 
-用以将 CF对象转换为OC对象，或者OC对象转换为CF对象,但是不会对对象的Retain Count,所有权 产生任何影响。
+**用以将 CF对象转换为OC对象，或者OC对象转换为CF对象,但是不会对对象的Retain Count,所有权 产生任何影响。**
 
-(1)CF对象转OC对象
+(1)CF对象转换为OC对象
 
 两行代码的简单例子: 
 
@@ -62,7 +62,7 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 不�
 
 #### 2.\_\_bridge_transfer
 
-__bridge_transfer 等价于 CFBridgingRelease(),  将CF对象转换为OC对象,并将所有权转移给ARC.  所有权转移给AR的本质含义就是：最终CF对象会被ARC生成的代码进行Retain Count -1操作或者释放.  
+**__bridge_transfer 等价于 CFBridgingRelease(),  将CF对象转换为OC对象,并将所有权转移给ARC.  所有权转移给ARC的本质含义就是：最终CF对象会被ARC生成的代码进行Retain Count -1操作或者释放，不需要手动调用CFRelease **
 
 CFBridgingRelease中的Release不是真的会进行Release操作，而应该理解为释放所有权:本来属于CF的，现在放权给ARC，CF不管了,我猜测这也就是为什么CFBridgingRelease的对应语法关键字不叫\_\_bridge_release,而叫\_\_bridge_transfer的原因，即transfer所有权.
 
@@ -75,7 +75,7 @@ NSString *ocString = (__bridge_transfer NSString *)cfString;
 
 此时不能再调用CFRelease(cfString)了，否则将造成崩溃，因为通过__bridge_transfer已经将cfString所有权交给ARC，ARC会生成相应的代码对它进行管理。道理就好像你明确告诉我桌子上的苹果🍎归我吃了，但又自己悄悄吃了，我去吃的时候发现苹果🍎没了，就会崩溃的。
 
-注: cfString 赋值给  ocString这个操作不会改变retainCount，这里虽然ocString默认是__strong属性的，但是因为 “ARC已经被\_\_bridge_transfer明确告知拥有了内存管理权”,因此不会为赋值操作生成额外的retain代码.
+注: cfString 赋值给  ocString这个操作不会改变retainCount，这里虽然ocString默认是__strong属性的，但是因为 “ARC已经被\_\_bridge_transfer明确告知拥有了内存管理权”,因此编译器不会为赋值操作生成额外的retain代码.
 
 感兴趣可以细看这两句代码对应汇编:
 
@@ -98,7 +98,7 @@ NSString *value = (__bridge_transfer NSString *)CFArrayGetValueAtIndex(cfArray, 
 
 ![](https://raw.githubusercontent.com/renjinkui2719/BLOG/master/PICS/cf_mem_policy.tiff)
 
-我们通过Create/Copy方法得到的对象我们是有所有权的，但是通过Get得到的，是没有所有权的.
+通过Create/Copy方法得到的对象我们是有所有权的，但是通过Get得到的，是没有所有权的.
 
 回到这个例子,Get得到的对象,假如叫对象O,这里直接将O通过__bridge_transfer/CFBridgingRelease()交给ARC管理，ARC就会为其生成对应的释放代码,结果就是释放了不属于自己的对象O, 等cfArray真正释放的时候，也会对O进行释放操作，但其实这时候O已经被ARC给释放了，所以就崩了.  本例如果在交给ARC前通过CFRetain得到所有权，就没毛病了.
 
@@ -128,9 +128,9 @@ CFRelease(cfSuffix);
 
 #### 3.\_\_bridge_retained
 
-\_\_bridge_retained 等价于 CFBridgingRetain (),用以将OC对象转换为CF对象，并为且Retain Count + 1.
+\_\_bridge_retained 等价于 CFBridgingRetain (),用以将OC对象转换为CF对象，并且Retain Count + 1.
 
-注意和__bridge_transfer转移所有权的差别，\_\_bridge_retained不存在转移什么所有权，而是简单粗暴的Retain Count + 1，编译器看到\_\_bridge_retained指示符，会生成一条对OC对象的retain语句并在赋值前调用.因此在不需要该CF对象的时候,必须手动调用CFRelease对其进行Retain Count -1;
+注意和__bridge_transfer转移所有权的差别，\_\_bridge_retained不存在转移什么所有权，而是简单粗暴的Retain Count + 1：编译器看到\_\_bridge_retained指示符，会生成一条对OC对象的retain语句并在赋值前调用它.因此在不需要该CF对象的时候,必须手动调用CFRelease对其进行Retain Count -1。 
 
  两行代码的简单例子: 
 
@@ -149,4 +149,4 @@ CFStringRef cfString = (__bridge_retained CFStringRef)ocString;
 
 #### 总结
 
-三句话可以说清楚的事情写如此一大堆，只期望能对更加清楚的认识：\_\_bridge,\_\_bridge_transfer,\_\_bridge_retaine有所帮助.
+三句话可以说清楚的事情写如此一大堆，只期望能对清楚的认识：\_\_bridge,\_\_bridge_transfer,\_\_bridge_retaine有所帮助.
