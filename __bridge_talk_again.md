@@ -62,7 +62,7 @@ __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 不�
 
 #### 2.\_\_bridge_transfer
 
-**__bridge_transfer 等价于 CFBridgingRelease(),  将CF对象转换为OC对象,并将所有权转移给ARC.  所有权转移给ARC的本质含义就是：最终CF对象会被ARC生成的代码进行Retain Count -1操作或者释放，不需要手动调用CFRelease **
+**\_\_bridge_transfer 等价于 CFBridgingRelease(),  将CF对象转换为OC对象,并将所有权转移给ARC.  所有权转移给ARC的本质含义就是：最终CF对象会被ARC生成的代码进行Retain Count -1操作或者释放，不需要手动调用CFRelease **
 
 CFBridgingRelease中的Release不是真的会进行Release操作，而应该理解为释放所有权:本来属于CF的，现在放权给ARC，CF不管了,我猜测这也就是为什么CFBridgingRelease的对应语法关键字不叫\_\_bridge_release,而叫\_\_bridge_transfer的原因，即transfer所有权.
 
