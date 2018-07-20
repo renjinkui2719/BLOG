@@ -20,8 +20,6 @@ CF手动管理: 对象生命周通过手动调用CFRetain/CFRelease来管理.
 
 ##### 用以将 CF对象转换为OC对象，或者OC对象转换为CF对象,但是不会对对象的Retain Count,所有权产生任何影响。
 
-当然__bridge也可以用在OC对象和C指针
-
 (1)CF对象转换为OC对象
 
 简单例子: 
@@ -34,7 +32,7 @@ NSData *nsData = (__bridge NSData *)cfData;
 
 __bridge可以理解为：只是为了让编译通过,  其他毫无影响, 最终还是需要手动调用CFRelease(cfData)来释放cfData.
 
-如果细心的跟一下，通过CFGetRetainCount，会发现cfData赋值给nsData后引用计数立即+1, 注意这跟\_\_bridge没有关系, 而是因为ARC 下 nsData默认为__strong类型,  因此在赋值给nsData前ARC生成的代码会对cfData进行Retain Count + 1操作, 最终通过objc_stroreStrong(ocString, nil) 对nsData再进行 -1操作,这个过程是ARC的本职工作范畴,跟右边的cfData是CF对象还是OC对象以及\_\_bridge都没有关系.  
+如果细心的跟一下，通过CFGetRetainCount，会发现cfData赋值给nsData后引用计数立即+1, 注意这跟\_\_bridge没有关系, 而是因为ARC 下 nsData默认为__strong类型,  因此在赋值给nsData前ARC生成的代码会对cfData进行Retain Count + 1操作, 最终通过objc_stroreStrong(nsData, nil) 对nsData再进行 -1操作,这个过程是ARC的本职工作范畴,跟右边的cfData是CF对象还是OC对象以及\_\_bridge都没有关系.  
 
 更多细节可以看这两行代码对应的汇编:
 
